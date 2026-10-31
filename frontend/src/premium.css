@@ -203,6 +203,7 @@ body {
   color: #aaa69c;
   font-size: 13px;
 }
+.device-kind-label {font-size:11px;color:#96978f;border:1px solid #ffffff10;padding:5px 8px;border-radius:8px;}
 .device-status-dot {
   width: 6px;
   height: 6px;

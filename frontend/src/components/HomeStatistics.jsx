@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import MagicBento from "./reactbits/MagicBento";
 import "./HomeStatistics.css";
-import {deviceActive} from './deviceCatalog';
+import { deviceActive } from "./deviceCatalog";
 
 const number = (value, digits = 0) =>
   Number(value).toLocaleString("ru-RU", {
@@ -148,9 +148,7 @@ export default function HomeStatistics({ home, online }) {
   const items = useMemo(() => {
     if (!home) return [];
     const devices = Object.entries(home.devices);
-    const on = devices.filter(
-      ([id,d]) => deviceActive(id,d),
-    ).length;
+    const on = devices.filter(([id, d]) => deviceActive(id, d)).length;
     const peak = history.length
       ? Math.max(...history.map((p) => p.power_w))
       : null;
@@ -163,7 +161,11 @@ export default function HomeStatistics({ home, online }) {
         <h3>{title}</h3>
       </div>
     );
-    const climate = devices.filter(([, d]) => "temperature" in d || "co2" in d);
+    const climate = devices.filter(([id]) =>
+      ["thermostat", "temp_sensor", "ventilation"].includes(
+        home.metadata[id]?.family,
+      ),
+    );
     return [
       {
         id: "power",
@@ -249,7 +251,7 @@ export default function HomeStatistics({ home, online }) {
                   <span>
                     {home.metadata[id]?.room}
                     {"co2" in d ? " · CO₂" : " · температура"}
-                    {'mode' in d && !d.mode && ' · последнее измерение'}
+                    {"mode" in d && !d.mode && " · последнее измерение"}
                   </span>
                 </div>
               ))}
@@ -279,7 +281,7 @@ export default function HomeStatistics({ home, online }) {
         <MagicBento
           items={items}
           columns={4}
-          rowHeight={174}
+          rowHeight={190}
           gap={16}
           radius={22}
           glowColor="237, 172, 130"

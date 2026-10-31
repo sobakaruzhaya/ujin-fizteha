@@ -62,7 +62,7 @@ class McpServerTest(unittest.TestCase):
         state = call(self.server, "get_home_state")
         self.assertIn("smart_plug_1", state["devices"])
         devices = call(self.server, "list_devices")
-        self.assertEqual(len(devices), 4)
+        self.assertEqual(len(devices), 15)
         self.assertTrue(all(item["declaration"] for item in devices))
 
     def test_two_step_command_flow(self):
@@ -96,7 +96,8 @@ class McpServerTest(unittest.TestCase):
     def test_energy_analysis(self):
         result = call(self.server, "analyze_energy")
         self.assertIn("total_power_w", result)
-        self.assertEqual(len(result["devices"]), 2)
+        self.assertEqual(len(result["devices"]), 8)
+        self.assertEqual(result['total_power_w'], self.orchestrator.state()['summary']['power_w'])
 
 
 if __name__ == "__main__":

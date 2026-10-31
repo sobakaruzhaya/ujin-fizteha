@@ -19,8 +19,8 @@ except ImportError:  # script mode: python app/run.py
     from home_client import HttpHomeClient, ensure_client
 
 INSTRUCTIONS = """\
-You are connected to Power Guardian, a smart-home control plane built around a
-smart plug with overload protection, lighting, a thermostat and ventilation.
+You are connected to UjinFizteha, a smart-home control plane with lighting,
+climate control, safety sensors, energy metering, household appliances and an intercom.
 
 Read state and events before acting. Explain the reason for every action.
 Dangerous commands use a two-step flow: call request_device_command, show the

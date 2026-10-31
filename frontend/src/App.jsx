@@ -26,7 +26,12 @@ import SpotlightCard from "./components/reactbits/SpotlightCard";
 import AnimatedContent from "./components/reactbits/AnimatedContent";
 import ScenarioSheet from "./components/ScenarioSheet";
 import HomeStatistics from "./components/HomeStatistics";
-import {descriptions,fallbackDescription,deviceActive,plural} from './components/deviceCatalog';
+import {
+  descriptions,
+  fallbackDescription,
+  deviceActive,
+  plural,
+} from "./components/deviceCatalog";
 import SquishSwitch from "./components/reactbits/SquishSwitch";
 import RubberSegment from "./components/reactbits/RubberSegment";
 import PillNav from "./components/reactbits/PillNav";
@@ -84,8 +89,8 @@ function operationStatus(id, state) {
       : state.fan_speed
         ? `Вентиляция · скорость ${state.fan_speed}`
         : "Вентилятор в ожидании";
-  const spec=descriptions[id]||fallbackDescription;
-  return spec.status ? spec.status(state) : 'На связи';
+  const spec = descriptions[id] || fallbackDescription;
+  return spec.status ? spec.status(state) : "На связи";
 }
 class EffectBoundary extends Component {
   state = { failed: false };
@@ -214,7 +219,7 @@ function DeviceDetails({ id, home, declarations, command, busy, online }) {
   const auto = useAutoDeviceCommand(id, command, (signal) =>
     setValues((old) => ({ ...old, [signal]: state[signal] })),
   );
-  const spec = descriptions[id]||fallbackDescription;
+  const spec = descriptions[id] || fallbackDescription;
   return (
     <>
       <div className="detail-hero">
@@ -792,7 +797,12 @@ function HomeApp() {
                           <strong>
                             {home ? Object.keys(home.devices).length : "—"}
                           </strong>{" "}
-                          устройства
+                          {plural(
+                            home ? Object.keys(home.devices).length : 0,
+                            "устройство",
+                            "устройства",
+                            "устройств",
+                          )}
                         </span>
                         <span>
                           <Workflow size={17} />
@@ -874,8 +884,9 @@ function HomeApp() {
                                   home.metadata[id].room === room,
                               )
                               .map(([id, d], index) => {
-                                const spec = descriptions[id]||fallbackDescription,
-                                  on = deviceActive(id,d),
+                                const spec =
+                                    descriptions[id] || fallbackDescription,
+                                  on = deviceActive(id, d),
                                   m = home.metadata[id];
                                 return (
                                   <AnimatedContent
@@ -916,22 +927,32 @@ function HomeApp() {
                                           />
                                           {m.room}
                                         </span>
-                                        {spec.toggle ? <Switch
-                                          on={on}
-                                          disabled={!online || !!pending[id]}
-                                          label={
-                                            (on ? "Выключить " : "Включить ") +
-                                            m.name
-                                          }
-                                          onClick={() =>
-                                            command(
-                                              id,
-                                              spec.toggle,
-                                              on ? 0 : spec.on,
-                                              false,
-                                            )
-                                          }
-                                        /> : <span className="device-kind-label">{home.metadata[id].family === 'intercom' ? 'Домофон' : 'На связи'}</span>}
+                                        {spec.toggle ? (
+                                          <Switch
+                                            on={on}
+                                            disabled={!online || !!pending[id]}
+                                            label={
+                                              (on
+                                                ? "Выключить "
+                                                : "Включить ") + m.name
+                                            }
+                                            onClick={() =>
+                                              command(
+                                                id,
+                                                spec.toggle,
+                                                on ? 0 : spec.on,
+                                                false,
+                                              )
+                                            }
+                                          />
+                                        ) : (
+                                          <span className="device-kind-label">
+                                            {home.metadata[id].family ===
+                                            "intercom"
+                                              ? "Домофон"
+                                              : "На связи"}
+                                          </span>
+                                        )}
                                       </div>
                                       <button
                                         className={
@@ -1005,7 +1026,7 @@ function HomeApp() {
                                           )}
                                           <NumberValue
                                             value={d[spec.signal]}
-                                            decimals={spec.decimals||0}
+                                            decimals={spec.decimals || 0}
                                           />
                                           <small>{spec.unit}</small>
                                         </span>
@@ -1327,7 +1348,9 @@ function HomeApp() {
               <strong>{online ? "Дом на связи" : "Нет соединения"}</strong>
               <small>{location.origin}</small>
             </div>
-            <span>{home?Object.keys(home.devices).length:'—'} эмуляторов</span>
+            <span>
+              {home ? Object.keys(home.devices).length : "—"} эмуляторов
+            </span>
           </div>
           <h3>Попробовать в лаборатории</h3>
           <p className="settings-description">
@@ -1354,6 +1377,31 @@ function HomeApp() {
                 "Мягкий свет и температура 23 °C.",
                 House,
               ],
+              [
+                "comfort",
+                "Тепло по датчику",
+                "19 °C в спальне. Термостат включит нагрев.",
+                SlidersHorizontal,
+              ],
+              [
+                "leak",
+                "Протечка",
+                "Датчик сработал, нагрузка отключена.",
+                ShieldCheck,
+              ],
+              [
+                "fire",
+                "Пожар",
+                "Задымление 80 %. Проверка тревоги.",
+                FlaskConical,
+              ],
+              [
+                "intercom",
+                "Звонок в дверь",
+                "Вызов домофона и свет в прихожей.",
+                House,
+              ],
+              ["kitchen", "Кухня", "Чайник и конфорка включены.", FlaskConical],
             ].map(([preset, title, sub, Icon]) => (
               <button
                 key={preset}

@@ -87,8 +87,7 @@ export const descriptions = {
     unit: "датчика",
     active: (d) => !d.mute,
     alarm: "leak",
-    status: (d) =>
-      d.leak ? "Протечка" : d.mute ? "Без звука" : "Охрана",
+    status: (d) => (d.leak ? "Протечка" : d.mute ? "Без звука" : "Охрана"),
   },
   fire_1: {
     image: "fire",
@@ -98,11 +97,7 @@ export const descriptions = {
     active: (d) => !d.alarm,
     alarm: "alarm",
     status: (d) =>
-      d.alarm
-        ? "Тревога"
-        : d.low_battery
-          ? "Низкий заряд"
-          : "Дежурство",
+      d.alarm ? "Тревога" : d.low_battery ? "Низкий заряд" : "Дежурство",
   },
   counter_1: {
     image: "counter",
@@ -130,11 +125,7 @@ export const descriptions = {
     active: (d) => !d.alarm,
     alarm: "alarm",
     status: (d) =>
-      d.alarm === 2
-        ? "Дверь открыта"
-        : d.alarm === 1
-          ? "Температура"
-          : "Норма",
+      d.alarm === 2 ? "Дверь открыта" : d.alarm === 1 ? "Температура" : "Норма",
   },
   kettle_1: {
     image: "kettle",
@@ -144,8 +135,7 @@ export const descriptions = {
     toggle: "power",
     on: 1,
     alarm: "dry_boil",
-    status: (d) =>
-      d.dry_boil ? "Сухой ход" : d.power ? "Нагрев" : "Готов",
+    status: (d) => (d.dry_boil ? "Сухой ход" : d.power ? "Нагрев" : "Готов"),
   },
   stove_1: {
     image: "stove",
@@ -216,7 +206,11 @@ export function plural(count, one, few, many) {
   return many;
 }
 
-export function deviceActive(id,state) {
- const spec=descriptions[id]||fallbackDescription;
- return spec.toggle ? !!state[spec.toggle] : spec.active ? !!spec.active(state) : true;
+export function deviceActive(id, state) {
+  const spec = descriptions[id] || fallbackDescription;
+  return spec.toggle
+    ? !!state[spec.toggle]
+    : spec.active
+      ? !!spec.active(state)
+      : true;
 }
