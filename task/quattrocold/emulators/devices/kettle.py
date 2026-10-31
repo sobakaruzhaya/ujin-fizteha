@@ -54,6 +54,10 @@ class Kettle(Device):
                 self.set_value("dry_boil", 1)
                 self.set_value("power", 0)
                 self.log(f"[{self.model}] сухой ход: нагрев заблокирован")
+            else:
+                self.set_value("power", 1)
+        elif name == "power" and not int(value):
+            self.set_value("power", 0)
         elif name == "reset" and int(value):
             self.set_value("dry_boil", 0)
             self.set_value("auto_off", 0)
