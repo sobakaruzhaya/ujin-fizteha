@@ -19,6 +19,7 @@ class Ventilation(Device):
         self.pm25_in = pm25_in
         self.co2_in = co2_in
         self._speed = 1
+        self._manual_speed = 1
         self.add_signal(Signal("supply_temp", "Температура притока", "graph", "r",
                                "property", 21.0, "°C"))
         self.add_signal(Signal("pm25", "PM2.5 на входе", "graph", "r", "property",
@@ -35,13 +36,27 @@ class Ventilation(Device):
 
     def on_command(self, name, value) -> None:
         if name == "fan_speed":
-            self._speed = int(value)
+            self._manual_speed = int(value)
+            if int(self.signals['mode'].value) != OFF:
+                self.set_value('mode', MANUAL)
+        if int(self.signals['mode'].value) == OFF:
+            self._speed = 0
+            self.set_value('fan_speed', 0)
+            self.set_value('heat_pct', 0)
+        elif name == 'mode' and int(value) == MANUAL:
+            self.set_value('fan_speed', self._manual_speed)
 
     def tick(self, dt: int) -> None:
         mode = int(self.signals["mode"].value)
         speed = int(self.signals["fan_speed"].value)
         if mode == OFF:
-            speed = 0
+            self._speed = 0
+            self.set_value('fan_speed', 0)
+            self.set_value('heat_pct', 0)
+            return  # Powered-off sensors retain their last measurement.
+        elif mode == MANUAL:
+            speed = self._manual_speed
+            self.set_value('fan_speed', speed)
         if mode == AUTO_M:
             target = self.signals["co2_target"].value
             co2 = self.signals["co2"].value

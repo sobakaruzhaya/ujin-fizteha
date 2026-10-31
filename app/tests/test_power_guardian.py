@@ -40,6 +40,54 @@ class SmartPlugTest(unittest.TestCase):
 
 
 class OrchestratorTest(unittest.TestCase):
+    def test_climate_off_stops_actuators_and_freezes_sensor_readings(self):
+        o = Orchestrator()
+        o.devices['ventilation_1'].set_value('co2', 1200)
+        o.step()
+        self.assertGreater(o.state()['devices']['ventilation_1']['fan_speed'], 0)
+        o.request_command('ventilation_1', 'mode', 0, False)
+        self.assertEqual(o.state()['devices']['ventilation_1']['fan_speed'], 0)
+        self.assertEqual(o.state()['devices']['ventilation_1']['heat_pct'], 0)
+        co2 = o.state()['devices']['ventilation_1']['co2']
+        measurements = {s: o.state()['devices']['ventilation_1'][s] for s in ['co2', 'pm25', 'supply_temp']}
+        for _ in range(5):
+            o.step()
+        self.assertEqual({s: o.state()['devices']['ventilation_1'][s] for s in measurements}, measurements)
+        self.assertEqual(o.state()['devices']['ventilation_1']['fan_speed'], 0)
+        thermostat = o.devices['thermostat_1']
+        thermostat.set_value('temperature', 18)
+        o.step()
+        self.assertEqual(o.state()['devices']['thermostat_1']['output'], 1)
+        o.request_command('thermostat_1', 'mode', 0, False)
+        temperature = o.state()['devices']['thermostat_1']['temperature']
+        for _ in range(5):
+            o.step()
+        self.assertEqual(o.state()['devices']['thermostat_1']['mode'], 0)
+        self.assertEqual(o.state()['devices']['thermostat_1']['output'], 0)
+        self.assertEqual(o.state()['devices']['thermostat_1']['temperature'], temperature)
+        o.request_command('ventilation_1', 'mode', 1, False)
+        o.request_command('thermostat_1', 'mode', 3, False)
+        o.step()
+        self.assertLess(o.state()['devices']['ventilation_1']['co2'], co2)
+        self.assertNotEqual(o.state()['devices']['thermostat_1']['temperature'], temperature)
+
+    def test_setting_fan_speed_switches_to_manual_mode(self):
+        o = Orchestrator()
+        o.request_command('ventilation_1', 'fan_speed', 5, False)
+        o.step()
+        self.assertEqual(o.state()['devices']['ventilation_1']['mode'], 2)
+        self.assertEqual(o.state()['devices']['ventilation_1']['fan_speed'], 5)
+
+    def test_ventilation_restores_manual_speed_after_off(self):
+        o = Orchestrator()
+        for signal, value in [('mode', 2), ('fan_speed', 4), ('mode', 0)]:
+            o.request_command('ventilation_1', signal, value, False)
+        o.step()
+        self.assertEqual(o.state()['devices']['ventilation_1']['fan_speed'], 0)
+        o.request_command('ventilation_1', 'mode', 2, False)
+        o.step()
+        self.assertEqual(o.state()['devices']['ventilation_1']['fan_speed'], 4)
+
     def setUp(self):
         self.o = Orchestrator(tick_seconds=60)
 
@@ -160,7 +208,7 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(content_type, "text/html")
         html = body.decode("utf-8")
-        self.assertIn("Power Guardian", html)
+        self.assertIn("UjinFizteha", html)
 
         stylesheet = re.search(r'href="([^"]+\.css)"', html).group(1)
         javascript = re.search(r'src="([^"]+\.js)"', html).group(1)

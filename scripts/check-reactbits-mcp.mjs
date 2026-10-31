@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-const child = spawn('npx', ['-y', 'shadcn@latest', 'mcp'], { cwd: process.cwd(), stdio: ['pipe', 'pipe', 'inherit'] });
+const child = spawn('npx', ['-y', 'shadcn@latest', 'mcp'], { cwd: process.cwd(), shell: process.platform === 'win32', stdio: ['pipe', 'pipe', 'inherit'] });
 const send = m => child.stdin.write(JSON.stringify({jsonrpc:'2.0',...m})+'\n');
 let buffer='';
 const timeout=setTimeout(()=>{console.error('MCP timeout');child.kill();process.exit(1)},120000);

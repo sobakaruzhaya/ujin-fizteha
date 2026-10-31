@@ -1,0 +1,89 @@
+.device-gauge-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #0002;
+  border: 1px solid #ffffff0c;
+  padding: 16px;
+  border-radius: 16px;
+  margin-top: 18px;
+}
+.device-gauge-info {
+  min-width: 0;
+  flex: 1;
+}
+.device-gauge-title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #c5bba9;
+  font-size: 13px;
+}
+.device-gauge-info > strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 28px;
+  font-weight: 400;
+  color: #f2f3f0;
+}
+.device-gauge-hint {
+  display: block;
+  max-width: 200px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #96978f;
+  margin: 6px 0 12px;
+}
+.device-gauge-control .secondary {
+  padding: 9px 14px;
+  font-size: 13px;
+  min-height: 36px;
+}
+.device-gauge-save { display:block; color:#b2aa9b; font-size:11px; margin-top:10px; }
+.detail-controls form > div { flex:1; }
+.detail-controls form input,.detail-controls form select { width:100%; }
+.device-gauge-control .slosh-gauge {
+  flex: none;
+}
+.slosh-gauge:focus-visible {
+  outline: 2px solid #edac82;
+  outline-offset: 5px;
+}
+.device-gauge-control[aria-busy="true"] {
+  opacity: 0.7;
+}
+.detail-controls .device-gauge-control {
+  display: flex;
+  border: 1px solid #ffffff10;
+  padding: 18px;
+  margin: 0;
+  border-radius: 16px;
+  background: #1a1c19;
+}
+.detail-controls .device-gauge-info { display:block; }
+.device-grid .device-card-bottom {
+  margin-bottom: auto;
+}
+.device-card .device-gauge-control {
+  position: relative;
+  z-index: 2;
+}
+.device-card .device-details-link {
+  top: 68px;
+  bottom: auto;
+  right: 16px;
+}
+.device-reading-label > span {
+  color: #bbad99;
+}
+.device-card .device-value:has(.device-reading-label) { display:block; }
+.sensor-paused-note { font-size:13px; line-height:1.6; padding:12px 16px; margin:0 0 18px; color:#c2b8a7; background:#edac8209; border:1px solid #edac8218; border-radius:12px; }
+.detail-controls,.detail-controls form { min-width:0; }
+@media(max-width:600px) {
+  .detail-controls > form:not(.device-gauge-control) { flex-direction:column; align-items:stretch; gap:10px; }
+  .detail-controls > form > label { max-width:none; }
+  .detail-controls > form:not(.device-gauge-control) > div { width:100%; }
+  .detail-controls input,.detail-controls select { flex:1; width:auto; min-width:0; }
+  .detail-controls .device-gauge-control { width:100%; }
+}

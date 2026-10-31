@@ -35,6 +35,9 @@ class Thermostat(Device):
         self.set_value("fault", 1 if on else 0)
 
     def on_command(self, name: str, value) -> None:
+        if name == 'mode' and int(value) == OFF:
+            self._active = 0
+            self.set_value('output', 0)
         if name == "target_temp":
             self.set_value("target_temp", self.clamp("target_temp", float(value)))
 
@@ -48,6 +51,8 @@ class Thermostat(Device):
         mode = int(self.signals["mode"].value)
         if mode == OFF:
             self._active = 0
+            self.set_value('output', 0)
+            return  # No new sensor measurement while the thermostat is off.
         else:
             want_heat = mode in (HEAT, AUTO)
             want_cool = mode in (COOL, AUTO)

@@ -3,8 +3,22 @@
   src: local("Manrope"), local("Arial");
   font-display: swap;
 }
+.hero { position:relative; isolation:isolate; }
+.home-page { position:relative; isolation:isolate; }
+.home-cubes { position:absolute; inset:0; z-index:-1; opacity:.55; overflow:hidden; mask-image:linear-gradient(180deg,#000, #000 75%,transparent); }
+.hero h1,.page-intro h1 { font-weight:500!important; letter-spacing:-1.5px!important; font-size:clamp(32px,4vw,48px)!important; }
+.scenario-dialog { width:min(640px,calc(100vw - 32px))!important; padding:24px!important; }
+.scenario-dialog .rule-group { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:16px 0!important; margin:12px 0!important; }
+.scenario-dialog .rule-group h3 { grid-column:1/-1; margin:0!important; font-size:15px!important; color:#ededeb!important; }
+.scenario-dialog .rule-group .form-row { grid-column:1/-1; }
+.scenario-dialog label { margin:0!important; font-size:12px!important; }
+.scenario-dialog input,.scenario-dialog select { margin-top:6px!important; padding:10px 12px!important; min-height:40px; border-radius:6px!important; }
+.scenario-dialog .rule-group small { grid-column:1/-1; }
+.scenario-dialog .modal-actions { margin-top:16px!important; }
+.scenario-dialog .checkbox { margin-top:16px!important; }
+@media(max-width:480px) { .scenario-dialog .rule-group { grid-template-columns:1fr; }.home-cubes { inset:0; opacity:.12; } }
 :root {
-  font-family: Guardian, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Play", sans-serif;
   color: #efefec;
   background: #000;
   color-scheme: dark;
@@ -17,6 +31,16 @@
 * {
   box-sizing: border-box;
 }
+.login-page { position:relative; isolation:isolate; min-height:100svh; display:grid; grid-template-columns:1.1fr 1fr; }
+.login-grid { position:absolute; inset:0; z-index:-1; pointer-events:none; }
+.login-page .login-story { background:radial-gradient(ellipse at 25% 60%, #35241899 0, #110e0b66 36%, transparent 72%); }
+.login-story { padding:48px 9%; display:flex; flex-direction:column; justify-content:space-between; min-height:100svh; border-right:1px solid var(--line); background:radial-gradient(ellipse at 25% 60%, #352418 0, #110e0b 36%, #050605 72%); }
+.login-brand { font-size:25px; font-weight:700; text-decoration:none; letter-spacing:-1px; }.login-brand span { color:var(--accent); }
+.login-eyebrow { font-size:10px; letter-spacing:2.8px; color:var(--accent); }
+.login-story h1 { font-size:clamp(48px,6vw,88px); line-height:1.04; letter-spacing:-4px; font-weight:400; margin:30px 0; }.login-story h1 em { font-style:normal; color:var(--accent); }
+.login-story p { max-width:300px; color:#99978f; font-size:15px; line-height:1.8; }.login-footnote { display:flex; gap:10px; align-items:center; color:#88877f; font-size:12px; }
+.login-panel { display:flex; align-items:center; justify-content:center; padding:60px 32px; }.login-form { width:100%; max-width:360px; }.login-form h2 { font-size:32px; font-weight:400; letter-spacing:-1px; margin:22px 0 12px; }.login-form > p { color:#85867f; font-size:13px; margin-bottom:40px; }.login-form label { display:block; font-size:12px; margin:22px 0 10px; }.login-form input { width:100%; padding:15px; background:#0d0e0c; border:1px solid #292a26; border-radius:10px; color:#efefec; outline:none; }.login-form input:focus { border-color:var(--accent); }.login-password { position:relative; }.login-password input { padding-right:85px; }.login-password button { position:absolute; right:14px; top:0; height:100%; background:none; border:0; color:#96978f; font-size:11px; }.login-submit,.login-demo { width:100%; display:flex; align-items:center; justify-content:center; gap:12px; padding:15px!important; }.login-submit { margin-top:30px; }.login-divider { display:flex; align-items:center; gap:12px; margin:28px 0; color:#77796f; font-size:10px; }.login-divider:before,.login-divider:after { content:""; height:1px; flex:1; background:var(--line); }.login-note { display:block; color:#66685f; font-size:11px; line-height:1.7; margin-top:26px; }
+@media(max-width:720px) { .login-page { grid-template-columns:1fr; }.login-story { min-height:auto; padding:28px; gap:38px; border-right:0; border-bottom:1px solid var(--line); }.login-story h1 { font-size:48px; letter-spacing:-2px; margin:16px 0; }.login-story p,.login-footnote { display:none; }.login-panel { padding:40px 28px; } }
 body {
   margin: 0;
 }

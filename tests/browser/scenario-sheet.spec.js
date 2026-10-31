@@ -1,0 +1,81 @@
+import { test, expect } from '@playwright/test';
+
+test.beforeEach(async ({page})=>{
+  await page.addInitScript(()=>sessionStorage.setItem('guardian-demo-entered','1'));
+  await page.goto('/web/#scenarios');
+  await page.getByRole('button',{name:'Новый сценарий',exact:true}).click();
+});
+
+test('sheet validates, saves multiple real actions, edits and restores keyboard focus', async({page,request})=>{
+  const sheet=page.getByRole('dialog',{name:'Новый сценарий',exact:true});
+  await expect(sheet.getByLabel('Название сценария')).toBeFocused();
+  await sheet.getByRole('button',{name:'Создать сценарий',exact:true}).click();
+  await expect(sheet.getByText('Введите название сценария')).toBeVisible();
+  await sheet.getByLabel('Название сценария').fill('Multi action integration');
+  const condition=sheet.locator('.builder-card').first();
+  await expect(condition.getByRole('spinbutton',{name:'Значение условия'})).toHaveAttribute('aria-valuenow','1000');
+  const combo=condition.getByRole('combobox',{name:'Устройство',exact:true});
+  await combo.focus(); await page.keyboard.press('Enter'); await page.keyboard.press('Escape');
+  await expect(sheet).toBeVisible();
+  await expect(combo).toHaveAttribute('aria-expanded','false');
+  const firstAction=sheet.locator('.builder-action-list .builder-card').first();
+  await firstAction.getByRole('button',{name:'Включить',exact:true}).click();
+  await sheet.getByRole('button',{name:'Добавить действие',exact:true}).click();
+  await expect(sheet.locator('.builder-action-list .builder-card')).toHaveCount(2);
+  const second=sheet.locator('.builder-action-list .builder-card').nth(1);
+  await second.getByRole('combobox',{name:'Устройство',exact:true}).click();
+  await second.getByRole('option',{name:'Основной свет',exact:true}).click();
+  await second.getByRole('combobox',{name:'Действие',exact:true}).click();
+  await second.getByRole('option',{name:'Яркость',exact:true}).click();
+  const value=second.getByRole('spinbutton',{name:'Значение действия'});
+  await value.fill('42');await value.press('Tab');
+  await sheet.getByRole('switch',{name:'Активировать после сохранения'}).click();
+  await sheet.getByRole('button',{name:'Создать сценарий',exact:true}).click();
+  await expect(sheet).not.toBeVisible();
+  const saved=(await (await request.get('/api/scenarios')).json()).find(s=>s.name==='Multi action integration');
+  expect(saved.enabled).toBe(false);
+  expect(saved.do).toEqual([{device:'light_1',signal:'lamp',value:1},{device:'light_1',signal:'brightness',value:42}]);
+  expect(saved.when).toEqual({device:'smart_plug_1',signal:'power_w',operator:'>',value:1000});
+  await page.getByRole('link',{name:'Мой дом',exact:true}).click();
+  await page.getByRole('button',{name:'Настроить Multi action integration',exact:true}).click();
+  const edit=page.getByRole('dialog',{name:'Изменить сценарий',exact:true});
+  await expect(edit.locator('.builder-action-list .builder-card')).toHaveCount(2);
+  await expect(edit.getByRole('switch')).toHaveAttribute('aria-checked','false');
+  await edit.getByRole('button',{name:'Удалить действие 2'}).click();
+  await expect(edit.locator('.builder-action-list .builder-card')).toHaveCount(1);
+  await edit.getByRole('button',{name:'Сохранить изменения'}).click();
+  await expect(edit).not.toBeVisible();
+  expect((await (await request.get('/api/scenarios')).json()).find(s=>s.id===saved.id).do).toHaveLength(1);
+  await request.delete(`/api/scenarios/${saved.id}`);
+});
+
+test('mobile sheet scrolls above pinned footer, handles save failure and Escape',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  const sheet=page.getByRole('dialog',{name:'Новый сценарий',exact:true});
+  await expect.poll(()=>sheet.evaluate(e=>Math.round(e.getBoundingClientRect().width))).toBe(390);
+  await sheet.getByLabel('Название сценария').fill('Failure check');
+  const activation=sheet.getByRole('switch',{name:'Активировать после сохранения'});
+  await activation.scrollIntoViewIfNeeded();
+  const centered = () => activation.evaluate(button=>{
+    const track=button.querySelector('.squish-switch__track').getBoundingClientRect();
+    const thumb=button.querySelector('.squish-switch__thumb').getBoundingClientRect();
+    return Math.abs((thumb.top+thumb.height/2)-(track.top+track.height/2))<1 && thumb.left>=track.left && thumb.right<=track.right;
+  });
+  await expect.poll(centered).toBe(true);
+  await activation.click();
+  await expect.poll(centered).toBe(true);
+  await page.route('**/api/scenarios',route=>route.request().method()==='POST'?route.abort('failed'):route.continue());
+  await sheet.getByRole('button',{name:'Создать сценарий',exact:true}).click();
+  await expect(sheet.getByRole('status')).toBeVisible();
+  await expect(sheet.getByRole('button',{name:'Создать сценарий',exact:true})).toBeEnabled();
+  await sheet.getByRole('button',{name:'Добавить действие'}).click();
+  await sheet.getByRole('button',{name:'Добавить действие'}).click();
+  await sheet.getByRole('switch',{name:'Активировать после сохранения'}).scrollIntoViewIfNeeded();
+  const footer=await sheet.locator('.builder-footer').boundingBox();
+  expect(footer.y+footer.height).toBeLessThanOrEqual(845);
+  expect(Math.abs(footer.y+footer.height-844)).toBeLessThan(2);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(sheet).not.toBeVisible();
+  await expect(page.getByRole('button',{name:'Новый сценарий',exact:true})).toBeFocused();
+});

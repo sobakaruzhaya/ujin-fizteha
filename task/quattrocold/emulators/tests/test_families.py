@@ -42,12 +42,16 @@ class TestCounter(unittest.TestCase):
 
 
 class TestVentilation(unittest.TestCase):
-    def test_co2_rises_when_off(self):
+    def test_sensors_do_not_measure_when_off(self):
         v = Ventilation(serial="1")
         v.signals["mode"].value = 0
         v.signals["co2"].value = 600
-        v.tick(1)
-        self.assertGreater(v.signals["co2"].value, 600)
+        before = {name: v.signals[name].value for name in ['co2', 'pm25', 'supply_temp']}
+        for _ in range(5):
+            v.tick(1)
+        self.assertEqual({name: v.signals[name].value for name in before}, before)
+        self.assertEqual(v.signals['fan_speed'].value, 0)
+        self.assertEqual(v.signals['heat_pct'].value, 0)
 
     def test_auto_mode_reduces_co2(self):
         v = Ventilation(serial="1")
