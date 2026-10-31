@@ -9,6 +9,7 @@ export default defineConfig({
     reducedMotion: 'reduce',
     viewport: { width: 1440, height: 1000 },
     launchOptions: {
+      channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
       args: [
         "--use-gl=angle",
         "--use-angle=swiftshader",

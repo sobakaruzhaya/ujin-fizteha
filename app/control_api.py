@@ -139,7 +139,12 @@ class ControlServer:
                         scenario_id = path.split("/")[3]
                         return self.send_json(owner.orchestrator.toggle_scenario(scenario_id, body.get("enabled")))
                     if path == "/api/commands/preview":
-                        return self.send_json(owner.orchestrator.request_command(body["device"], body["signal"], body.get("value")))
+                        require_confirmation = body.get("require_confirmation", True)
+                        if not isinstance(require_confirmation, bool):
+                            raise ValueError("require_confirmation должен быть логическим значением")
+                        return self.send_json(owner.orchestrator.request_command(
+                            body["device"], body["signal"], body.get("value"), require_confirmation,
+                        ))
                     if path.startswith("/api/commands/") and path.endswith("/confirm"):
                         token = path.split("/")[3]
                         return self.send_json(owner.orchestrator.confirm_command(token))

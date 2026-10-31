@@ -1,5 +1,12 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import "@fontsource/play/latin-400.css";
+import "@fontsource/play/cyrillic-400.css";
+import "@fontsource/play/latin-700.css";
+import "@fontsource/play/cyrillic-700.css";
 import "./style.css";
+import "./refinements.css";
+import "./tailwind.css";
+import "./premium.css";
 createRoot(document.getElementById("root")).render(<App />);

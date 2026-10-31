@@ -1,0 +1,176 @@
+.home-statistics {
+  margin: 34px 0 40px;
+}
+.home-statistics .section-heading {
+  align-items: center;
+}
+.stats-update {
+  font-size: 12px;
+  color: #96978f;
+}
+.stats-bento {
+  --mb-surface: linear-gradient(145deg, #1b1c18, #10130f) !important;
+  --mb-focus: #edac82 !important;
+}
+.stats-bento .magic-bento__content {
+  display: flex;
+  flex-direction: column;
+  padding: 22px;
+  height: 100%;
+  box-sizing: border-box;
+  gap: 0;
+}
+.stats-bento .magic-bento__card {
+  border: 1px solid #ffffff0b;
+  box-shadow: none;
+}
+.stats-card-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: #edac82;
+}
+.stats-card-heading h3 {
+  font-size: 14px;
+  color: #c5c3b9;
+  font-weight: 400;
+  margin: 0;
+}
+.stats-number {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  font-size: 32px;
+  color: #f2f3f0;
+  margin: 18px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.stats-number small {
+  font-size: 14px;
+  color: #96978f;
+}
+.stats-number svg {
+  align-self: center;
+  margin-left: auto;
+  color: #edac82;
+}
+.stats-bento p {
+  font-size: 12px;
+  margin: 10px 0 0;
+  color: #96978f;
+  line-height: 1.5;
+}
+.stats-power-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+.stats-large-number {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 48px;
+  line-height: 1;
+  margin: 22px 0 16px;
+  font-variant-numeric: tabular-nums;
+}
+.stats-large-number small {
+  font-size: 14px;
+  color: #96978f;
+}
+.stats-power-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  color: #96978f;
+  font-size: 12px;
+}
+.stats-power-summary strong {
+  color: #ddd9d0;
+  font-weight: 400;
+  margin-left: 6px;
+}
+.stats-power-summary > span:last-child {
+  margin-left: auto;
+}
+.stats-chart {
+  margin-top: auto;
+  padding-top: 18px;
+  min-height: 0;
+}
+.stats-chart svg {
+  width: 100%;
+  height: 130px;
+  display: block;
+  color: #ffffff0d;
+  overflow: visible;
+}
+.stats-chart-times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #96978f;
+}
+.stats-chart-empty {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  font-size: 13px;
+  color: #96978f;
+  padding: 20px;
+}
+.stats-climate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-top: 20px;
+}
+.stats-climate strong {
+  display: block;
+  color: #f2f3f0;
+  font-size: 21px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.stats-climate span {
+  display: block;
+  margin-top: 7px;
+  color: #96978f;
+  font-size: 11px;
+}
+.stats-loading {
+  border: 1px solid #ffffff10;
+  border-radius: 20px;
+  padding: 30px;
+  color: #96978f;
+  background: #141611;
+}
+@media (max-width: 760px) {
+  .stats-bento .magic-bento__content {
+    padding: 18px;
+  }
+  .stats-power-summary > span:last-child {
+    margin-left: 0;
+  }
+  .stats-number {
+    font-size: 27px;
+  }
+  .stats-large-number {
+    font-size: 40px;
+  }
+  .home-statistics .section-heading {
+    align-items: flex-start;
+  }
+  .stats-update {
+    font-size: 11px;
+  }
+  .stats-climate {
+    margin-top: 14px;
+    gap: 10px;
+  }
+  .stats-climate strong {
+    font-size: 19px;
+  }
+}

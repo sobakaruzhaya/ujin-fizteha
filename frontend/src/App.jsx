@@ -21,9 +21,17 @@ import {
   MoveUpRight,
 } from "lucide-react";
 import CountUp from "./components/reactbits/CountUp";
-import Dither from "./components/reactbits/Dither";
 import DarkVeil from "./components/reactbits/DarkVeil";
 import SpotlightCard from "./components/reactbits/SpotlightCard";
+import AnimatedContent from "./components/reactbits/AnimatedContent";
+import ScenarioSheet from "./components/ScenarioSheet";
+import HomeStatistics from "./components/HomeStatistics";
+import SquishSwitch from "./components/reactbits/SquishSwitch";
+import RubberSegment from "./components/reactbits/RubberSegment";
+import PillNav from "./components/reactbits/PillNav";
+import CardSwap, { Card } from "./components/reactbits/CardSwap";
+import DeviceGauge from "./components/DeviceGauge";
+import useAutoDeviceCommand from "./components/useAutoDeviceCommand";
 
 const base = import.meta.env.BASE_URL;
 const descriptions = {
@@ -93,6 +101,23 @@ function NumberValue({ value, decimals = 0, ...props }) {
     />
   );
 }
+function operationStatus(id, state) {
+  if (id === "thermostat_1") {
+    if (!state.mode) return "Обогрев и охлаждение выключены";
+    return state.output === 1
+      ? "Нагрев"
+      : state.output === 2
+        ? "Охлаждение"
+        : "Ожидание";
+  }
+  if (id === "ventilation_1")
+    return !state.mode
+      ? "Вентилятор выключен"
+      : state.fan_speed
+        ? `Вентиляция · скорость ${state.fan_speed}`
+        : "Вентилятор в ожидании";
+  return state[descriptions[id].toggle] ? "Включено" : "Выключено";
+}
 class EffectBoundary extends Component {
   state = { failed: false };
   static getDerivedStateFromError() {
@@ -135,19 +160,37 @@ function Modal({ children, title, onClose, className = "" }) {
 }
 function Switch({ on, onClick, label, disabled }) {
   return (
-    <button
-      className={"switch " + (on ? "on" : "")}
-      role="switch"
-      aria-label={label}
-      aria-checked={on}
-      onClick={onClick}
+    <SquishSwitch
+      checked={on}
+      onChange={onClick}
+      ariaLabel={label}
       disabled={disabled}
-    >
-      <span />
-    </button>
+      width={48}
+      height={28}
+      trackColor="#35382f"
+      trackOnColor="rgb(var(--device-tint, 168, 187, 163))"
+      thumbOnColor="#241b14"
+    />
   );
 }
-function Activity({ events, short = false }) {
+function Activity({ events, short = false, metadata = {} }) {
+  const reduce = useReducedMotion();
+  function description(e) {
+    if (e.device && metadata[e.device]) {
+      if (e.signal === "lamp" || e.signal === "power_switch")
+        return e.value ? "Включено" : "Выключено";
+      if (e.signal === "mode") return `Режим изменён · ${e.value}`;
+      if (e.signal === "brightness") return `Яркость · ${e.value}%`;
+      const prefix = metadata[e.device].name + ": ";
+      if (e.message?.startsWith(prefix)) return e.message.slice(prefix.length);
+    }
+    return (
+      e.message ||
+      (e.type === "state_change"
+        ? `Розетка ${e.value ? "включена" : "выключена"}`
+        : e.type)
+    );
+  }
   const visible = events
     .filter((e) => e.type !== "log")
     .slice()
@@ -156,7 +199,14 @@ function Activity({ events, short = false }) {
   return visible.length ? (
     <div className="activity-list">
       {visible.map((e) => (
-        <div className="activity-row" key={e.id}>
+        <motion.div
+          className="activity-row"
+          key={e.id}
+          layout={!reduce}
+          initial={reduce ? false : { opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+        >
           <span
             className={"activity-icon " + (e.type === "alarm" ? "warning" : "")}
           >
@@ -169,13 +219,15 @@ function Activity({ events, short = false }) {
             )}
           </span>
           <span>
-            {e.message ||
-              (e.type === "state_change"
-                ? `Розетка ${e.value ? "включена" : "выключена"}`
-                : e.type)}
+            {e.device && metadata[e.device] && (
+              <strong className="activity-device">
+                {metadata[e.device].name}
+              </strong>
+            )}
+            {description(e)}
             <small>{new Date(e.time * 1000).toLocaleTimeString("ru-RU")}</small>
           </span>
-        </div>
+        </motion.div>
       ))}
     </div>
   ) : (
@@ -186,10 +238,13 @@ function Activity({ events, short = false }) {
     </div>
   );
 }
-function DeviceDetails({ id, home, declarations, command }) {
+function DeviceDetails({ id, home, declarations, command, busy, online }) {
   const state = home.devices[id],
     sigs = declarations[id] || [];
   const [values, setValues] = useState({ ...state });
+  const auto = useAutoDeviceCommand(id, command, (signal) =>
+    setValues((old) => ({ ...old, [signal]: state[signal] })),
+  );
   const spec = descriptions[id];
   return (
     <>
@@ -205,10 +260,16 @@ function DeviceDetails({ id, home, declarations, command }) {
           </strong>
         </span>
       </div>
+      {(id === "thermostat_1" || id === "ventilation_1") && !state.mode && (
+        <p className="sensor-paused-note">
+          Датчики выключены. Показаны последние измерения — обновление
+          возобновится после включения устройства.
+        </p>
+      )}
       {id === "smart_plug_1" && !!state.overload_alarm && (
         <p className="inline-warning">
-          Сработала защита. Уменьшите нагрузку ниже лимита, примените изменение,
-          сбросьте защиту и включите розетку.
+          Сработала защита. Уменьшите нагрузку ниже лимита, сбросьте защиту и
+          включите розетку.
         </p>
       )}
       <div className="detail-readings">
@@ -224,18 +285,32 @@ function DeviceDetails({ id, home, declarations, command }) {
           ))}
       </div>
       <div className="detail-controls">
+        {(id === "light_1" || id === "ventilation_1") && (
+          <DeviceGauge
+            id={id}
+            state={state}
+            onCommand={command}
+            busy={busy}
+            online={online}
+          />
+        )}
         {sigs
-          .filter((s) => s.management !== "r")
+          .filter(
+            (s) =>
+              s.management !== "r" &&
+              !(
+                (id === "light_1" && s.name === "brightness") ||
+                (id === "ventilation_1" && s.name === "fan_speed")
+              ),
+          )
           .map((s) => (
             <form
               key={s.name}
+              className={s.name === "brightness" ? "brightness-control" : ""}
               onSubmit={(e) => {
                 e.preventDefault();
-                command(
-                  id,
-                  s.name,
-                  Number(s.control === "button" ? 1 : values[s.name]),
-                );
+                if (s.control === "button") command(id, s.name, 1, false);
+                else auto.flush(s.name);
               }}
             >
               <label htmlFor={"signal-" + s.name}>{s.title}</label>
@@ -243,10 +318,15 @@ function DeviceDetails({ id, home, declarations, command }) {
                 {s.control === "button" ? null : s.layout ? (
                   <select
                     id={"signal-" + s.name}
+                    disabled={busy || !online}
                     value={values[s.name]}
-                    onChange={(e) =>
-                      setValues({ ...values, [s.name]: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setValues((old) => ({
+                        ...old,
+                        [s.name]: e.target.value,
+                      }));
+                      auto.schedule(s.name, Number(e.target.value), 0);
+                    }}
                   >
                     {Object.entries(s.layout).map(([value, title]) => (
                       <option value={value} key={value}>
@@ -257,20 +337,36 @@ function DeviceDetails({ id, home, declarations, command }) {
                 ) : (
                   <input
                     required
+                    disabled={busy || !online}
                     id={"signal-" + s.name}
                     type="number"
                     step="any"
                     min={s.min}
                     max={s.max}
                     value={values[s.name]}
-                    onChange={(e) =>
-                      setValues({ ...values, [s.name]: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setValues((old) => ({
+                        ...old,
+                        [s.name]: e.target.value,
+                      }));
+                      if (e.target.validity.valid)
+                        auto.schedule(s.name, Number(e.target.value));
+                      else auto.cancel(s.name);
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.reportValidity()) auto.flush(s.name);
+                    }}
                   />
                 )}
-                <button className="secondary" type="submit">
-                  {s.control === "button" ? "Сбросить защиту" : "Применить"}
-                </button>
+                {s.control === "button" && (
+                  <button
+                    className="secondary"
+                    type="submit"
+                    disabled={busy || !online}
+                  >
+                    {busy ? "Выполнение…" : "Сбросить защиту"}
+                  </button>
+                )}
               </div>
             </form>
           ))}
@@ -278,247 +374,149 @@ function DeviceDetails({ id, home, declarations, command }) {
     </>
   );
 }
-function ScenarioEditor({ item, home, declarations, onSave, notify }) {
-  const [name, setName] = useState(item?.name || "");
-  const [when, setWhen] = useState(
-    item?.when || {
-      device: "smart_plug_1",
-      signal: "power_w",
-      operator: ">",
-      value: 1000,
-    },
-  );
-  const [actions, setActions] = useState(
-    item?.do || [{ device: "light_1", signal: "lamp", value: 0 }],
-  );
-  const [enabled, setEnabled] = useState(item?.enabled ?? true);
-  const [preview, setPreview] = useState(null),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const draft = () => ({
-    ...(item?.id ? { id: item.id } : {}),
-    name,
-    enabled,
-    when,
-    do: actions,
-  });
-  const devices = Object.entries(home.metadata);
-  function signalChoices(id, writable) {
-    return (declarations[id] || []).filter(
-      (s) =>
-        s.name !== "fw" &&
-        (writable ? s.management !== "r" : s.management !== "w"),
-    );
-  }
-  function controls(value, set, action = false) {
-    return (
-      <>
-        <label>
-          Устройство
-          <select
-            value={value.device}
-            onChange={(e) => {
-              const id = e.target.value;
-              set({
-                ...value,
-                device: id,
-                signal: signalChoices(id, action)[0].name,
-              });
-            }}
-          >
-            {devices.map(([id, m]) => (
-              <option key={id} value={id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {action ? "Действие" : "Показатель"}
-          <select
-            value={value.signal}
-            onChange={(e) => set({ ...value, signal: e.target.value })}
-          >
-            {signalChoices(value.device, action).map((s) => (
-              <option key={s.name} value={s.name}>
-                {s.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="form-row">
-          {!action && (
-            <label>
-              Условие
-              <select
-                value={value.operator}
-                onChange={(e) => set({ ...value, operator: e.target.value })}
-              >
-                {[
-                  [">", "Больше"],
-                  ["<", "Меньше"],
-                  ["==", "Равно"],
-                  [">=", "Не меньше"],
-                  ["<=", "Не больше"],
-                  ["!=", "Не равно"],
-                ].map(([v, t]) => (
-                  <option key={v} value={v}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <label>
-            Значение
-            <input
-              required
-              type="number"
-              step="any"
-              value={value.value}
-              onChange={(e) =>
-                set({
-                  ...value,
-                  value: e.target.value === "" ? "" : Number(e.target.value),
-                })
-              }
-            />
-          </label>
-        </div>
-        {action && (
-          <small>
-            {Object.entries(
-              (declarations[value.device] || []).find(
-                (s) => s.name === value.signal,
-              )?.layout || {},
-            )
-              .map(([v, t]) => `${v} = ${t}`)
-              .join(" · ")}
-          </small>
-        )}
-      </>
-    );
-  }
-  async function test() {
-    setBusy(true);
-    setError("");
-    try {
-      const r = await api("/api/simulations", {
-        seconds: 30,
-        scenario: draft(),
-      });
-      const n = r.events.filter((e) => e.type === "scenario_triggered").length;
-      setPreview(
-        `За 30 секунд: ${n ? `${n} срабатываний` : "условие не наступило"}. Мощность в конце: ${r.state.summary.power_w} Вт. Состояние дома не изменилось.`,
-      );
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
+
+function Login({ onEnter }) {
+  const [visible, setVisible] = useState(false);
+  const reduce = useReducedMotion();
   return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setBusy(true);
-        try {
-          await onSave(draft());
-        } catch (err) {
-          setError(err.message);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <label>
-        Название
-        <input
-          required
-          value={name}
-          maxLength={120}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Например, уютный вечер"
-        />
-      </label>
-      <section className="rule-group">
-        <h3>
-          <span>Если</span> Происходит событие
-        </h3>
-        {controls(when, setWhen)}
-      </section>
-      {actions.map((a, i) => (
-        <section className="rule-group" key={i}>
-          <h3>
-            <span>Тогда</span> Выполнить действие{" "}
-            {actions.length > 1 && (
-              <button
-                type="button"
-                className="icon-button"
-                aria-label="Удалить действие"
-                onClick={() => setActions(actions.filter((_, j) => i !== j))}
-              >
-                <X size={14} />
-              </button>
-            )}
-          </h3>
-          {controls(
-            a,
-            (next) =>
-              setActions(actions.map((old, j) => (i === j ? next : old))),
-            true,
-          )}
-        </section>
-      ))}
-      <button
-        type="button"
-        className="text-button"
-        onClick={() =>
-          setActions([
-            ...actions,
-            { device: "light_1", signal: "lamp", value: 1 },
-          ])
-        }
-      >
-        <Plus size={14} />
-        Добавить действие
-      </button>
-      <label className="checkbox">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => setEnabled(e.target.checked)}
-        />
-        Включить после сохранения
-      </label>
-      {error && (
-        <p className="inline-warning" role="alert">
-          {error}
-        </p>
-      )}
-      {preview && (
-        <div className="preview-result" role="status">
-          {preview}
+    <main className="login-page">
+      <section className="login-story">
+        <a className="login-brand" href="#">
+          Ujin<span>Fizteha</span>
+        </a>
+        <div>
+          <span className="login-eyebrow">ВАШ ДОМ. В ВАШИХ РУКАХ.</span>
+          <h1>
+            Спокойствие
+            <br />
+            начинается
+            <br />
+            <em>дома.</em>
+          </h1>
+          <p>
+            Свет, климат и энергия — в одном пространстве, которое понимает вас.
+          </p>
         </div>
-      )}
-      <div className="modal-actions">
-        <button
-          type="button"
-          className="secondary"
-          onClick={test}
-          disabled={busy || !name}
+        <span className="login-footnote">
+          <ShieldCheck size={16} /> Умный дом под вашим контролем
+        </span>
+      </section>
+      <section className="login-panel">
+        <form
+          className="login-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onEnter();
+          }}
         >
-          Проверить · 30 сек
-        </button>
-        <button type="submit" className="primary" disabled={busy}>
-          Сохранить сценарий
-        </button>
-      </div>
-    </form>
+          <span className="login-eyebrow">UjinFizteha</span>
+          <h2>С возвращением</h2>
+          <p>Войдите, чтобы быть ближе к своему дому.</p>
+          <label htmlFor="login-email">Электронная почта</label>
+          <input
+            id="login-email"
+            type="email"
+            autoComplete="username"
+            placeholder="you@example.com"
+            required
+          />
+          <label htmlFor="login-password">Пароль</label>
+          <div className="login-password">
+            <input
+              id="login-password"
+              type={visible ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder="Введите пароль"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setVisible(!visible)}
+              aria-label={visible ? "Скрыть пароль" : "Показать пароль"}
+            >
+              {visible ? "Скрыть" : "Показать"}
+            </button>
+          </div>
+          <button className="primary login-submit" type="submit">
+            Войти <ArrowRight size={18} />
+          </button>
+          <div className="login-divider">
+            <span>Демонстрационная версия</span>
+          </div>
+          <button
+            className="secondary login-demo"
+            type="button"
+            onClick={onEnter}
+          >
+            Посмотреть демо <ArrowUpRight size={16} />
+          </button>
+          <small className="login-note">
+            Это демонстрационный экран входа. Учётные записи пока не подключены;
+            используйте тестовые данные.
+          </small>
+        </form>
+      </section>
+    </main>
   );
 }
 
 export default function App() {
+  const [entered, setEntered] = useState(
+    () => sessionStorage.getItem("guardian-demo-entered") === "1",
+  );
+  const reduce = useReducedMotion();
+  const [lowPower] = useState(
+    () =>
+      (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+      navigator.connection?.saveData ||
+      (navigator.deviceMemory && navigator.deviceMemory <= 4),
+  );
+  const [hidden, setHidden] = useState(document.hidden);
+  useEffect(() => {
+    const update = () => setHidden(document.hidden);
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
+  return (
+    <>
+      <div className="site-background" aria-hidden="true">
+        {!reduce && !lowPower && (
+          <EffectBoundary>
+            <DarkVeil
+              color="#b18664"
+              speed={0.08}
+              brightness={0.45}
+              glow={0.1}
+              grain={0}
+              quality={0.3}
+              dpr={1}
+              mouseInteraction={false}
+              paused={hidden}
+              intro={false}
+            />
+          </EffectBoundary>
+        )}
+      </div>
+      <div className="site-content">
+        {entered ? (
+          <HomeApp />
+        ) : (
+          <Login
+            onEnter={() => {
+              sessionStorage.setItem("guardian-demo-entered", "1");
+              setEntered(true);
+            }}
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
+function HomeApp() {
+  const [pending, setPending] = useState({});
+  const pendingRef = useRef(new Set());
+  const commandQueues = useRef(new Map());
   const [home, setHome] = useState(null),
     [declarations, setDeclarations] = useState({}),
     [scenarios, setScenarios] = useState([]),
@@ -537,6 +535,7 @@ export default function App() {
     [message, setMessage] = useState(null);
   const [eventFilter, setEventFilter] = useState("all");
   const refreshBusy = useRef(false),
+    scenarioDeck = useRef(null),
     timer = useRef(),
     resolveConfirm = useRef();
   const reduce = useReducedMotion();
@@ -636,22 +635,56 @@ export default function App() {
     setConfirmation(null);
     resolveConfirm.current?.(ok);
   }
-  async function command(id, signal, value) {
-    if (!online) return notify("Нет связи. Дождитесь подключения.", true);
-    try {
-      const r = await api("/api/commands/preview", {
-        device: id,
-        signal,
-        value,
-      });
-      if (r.status === "confirmation_required") {
-        if (!(await ask(r.summary))) return;
-        await api(`/api/commands/${r.confirmation_id}/confirm`, {});
+  function command(id, signal, value, requireConfirmation = false) {
+    if (!online) {
+      notify("Нет связи. Дождитесь подключения.", true);
+      return Promise.resolve(false);
+    }
+    pendingRef.current.add(id);
+    setPending((p) => ({ ...p, [id]: true }));
+    const execute = async () => {
+      try {
+        const r = await api("/api/commands/preview", {
+          device: id,
+          signal,
+          value,
+          require_confirmation: requireConfirmation,
+        });
+        if (r.status === "confirmation_required") {
+          if (!(await ask(r.summary))) return false;
+          await api(`/api/commands/${r.confirmation_id}/confirm`, {});
+        }
+        await refresh();
+        return true;
+      } catch (e) {
+        notify(e.message, true);
+        return false;
       }
-      notify("Настройки применены");
+    };
+    const run = (commandQueues.current.get(id) || Promise.resolve()).then(
+      execute,
+    );
+    commandQueues.current.set(id, run);
+    return run.finally(() => {
+      if (commandQueues.current.get(id) === run) {
+        commandQueues.current.delete(id);
+        pendingRef.current.delete(id);
+        setPending((p) => ({ ...p, [id]: false }));
+      }
+    });
+  }
+  async function toggleScenario(s) {
+    if (pendingRef.current.has(s.id)) return;
+    pendingRef.current.add(s.id);
+    setPending((p) => ({ ...p, [s.id]: true }));
+    try {
+      await api(`/api/scenarios/${s.id}/toggle`, { enabled: !s.enabled });
       await refresh();
     } catch (e) {
       notify(e.message, true);
+    } finally {
+      pendingRef.current.delete(s.id);
+      setPending((p) => ({ ...p, [s.id]: false }));
     }
   }
   async function experiment(preset) {
@@ -696,21 +729,29 @@ export default function App() {
           <span className="brand-symbol">
             <Zap size={21} fill="currentColor" />
           </span>
-          power<span>guardian</span>
+          Ujin<span>Fizteha</span>
         </a>
-        <nav aria-label="Главная навигация">
-          {[
-            ["home", "Мой дом", House],
-            ["scenarios", "Сценарии", Workflow],
-            ["history", "История", Clock3],
-          ].map(([id, label, Icon]) => (
-            <a key={id} className={page === id ? "active" : ""} href={"#" + id}>
-              <Icon size={15} />
-              <span>{label}</span>
-              {page === id && <motion.i layoutId="nav-dot" />}
-            </a>
-          ))}
-        </nav>
+        <div className="main-pill-nav">
+          <PillNav
+            ariaLabel="Главная навигация"
+            items={[
+              { label: "Мой дом", href: "#home" },
+              { label: "Сценарии", href: "#scenarios" },
+              { label: "История", href: "#history" },
+            ]}
+            activeHref={`#${page}`}
+            size="lg"
+            surface="solid"
+            indicator="pill"
+            hoverEffect="glide"
+            highlightColor="#edac82"
+            highlightTextColor="#17120e"
+            barColor="#151614"
+            itemStyle="plain"
+            collapse="never"
+            intro={!reduce}
+          />
+        </div>
         <div className="header-right">
           <span className={"connection " + (!online ? "offline" : "")}>
             <i />
@@ -743,269 +784,356 @@ export default function App() {
               </div>
             )}
             {page === "home" && (
-              <>
-                <section className="hero">
-                  <div className="hero-copy">
-                    <span className="home-location">
-                      <House size={13} /> Моя квартира <span> / </span>{" "}
-                      {new Date().toLocaleDateString("ru-RU", {
-                        day: "numeric",
-                        month: "long",
-                      })}
-                    </span>
-                    <h1>
-                      {alarm ? (
-                        <>
-                          Дом просит
-                          <br />
-                          вашего внимания.
-                        </>
-                      ) : (
-                        <>
-                          Дома всё
-                          <br />
-                          как надо.
-                        </>
+              <AnimatedContent
+                distance={reduce ? 0 : 18}
+                duration={0.5}
+                initialOpacity={reduce ? 1 : 0}
+              >
+                <div className="home-page">
+                  <section className="hero">
+                    <div className="hero-copy">
+                      <span className="home-location">
+                        <House size={13} /> Моя квартира <span> / </span>{" "}
+                        {new Date().toLocaleDateString("ru-RU", {
+                          day: "numeric",
+                          month: "long",
+                        })}
+                      </span>
+                      <h1>
+                        {alarm ? (
+                          <>
+                            Дом просит
+                            <br />
+                            вашего внимания.
+                          </>
+                        ) : (
+                          <>
+                            Дома всё
+                            <br />
+                            как надо.
+                          </>
+                        )}
+                      </h1>
+                      {alarm && (
+                        <p>Защита отключила розетку. Проверьте нагрузку.</p>
                       )}
-                    </h1>
-                    <p>
-                      {alarm
-                        ? "Защита отключила розетку. Проверьте нагрузку."
-                        : "Свет, тепло и спокойствие. В вашем ритме."}
-                    </p>
-                    <div className="hero-status">
-                      <span>
-                        <i />4 устройства
+                      <div className="hero-status">
+                        <span>
+                          <House size={17} />
+                          <strong>
+                            {home ? Object.keys(home.devices).length : "—"}
+                          </strong>{" "}
+                          устройства
+                        </span>
+                        <span>
+                          <Workflow size={17} />
+                          <strong>
+                            {home?.summary.active_scenarios ?? "—"}
+                          </strong>{" "}
+                          активных сценариев
+                        </span>
+                        <span>
+                          <ShieldCheck size={17} />
+                          {alarm ? "Защита сработала" : "Защита активна"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="hero-energy">
+                      <span className="energy-icon">
+                        <Zap size={19} />
                       </span>
-                      <span>
-                        <Workflow size={13} />
-                        {home?.summary.active_scenarios ?? "—"} сценариев
-                      </span>
-                      <span>
-                        <ShieldCheck size={14} />
-                        {alarm ? "Защита сработала" : "Защита активна"}
-                      </span>
+                      <span>Дом потребляет</span>
+                      <div>
+                        <NumberValue value={home?.summary.power_w || 0} />
+                        <small>Вт</small>
+                      </div>
+                      <p>
+                        {Number(home?.summary.energy_kwh || 0).toFixed(4)} кВт·ч
+                        за сеанс
+                      </p>
                     </div>
-                  </div>
-                  <div className="hero-energy">
-                    <span className="energy-icon">
-                      <Zap size={19} />
-                    </span>
-                    <span>Дом потребляет</span>
-                    <div>
-                      <NumberValue value={home?.summary.power_w || 0} />
-                      <small>Вт</small>
-                    </div>
-                    <p>
-                      {Number(home?.summary.energy_kwh || 0).toFixed(4)} кВт·ч
-                      за сеанс
-                    </p>
-                  </div>
-                </section>
-                {alarm && (
-                  <button
-                    className="alarm-banner"
-                    onClick={() => setSelected("smart_plug_1")}
-                  >
-                    <span>
-                      <ShieldCheck size={18} />
-                      Розетка отключена защитой
-                    </span>
-                    <span>
-                      Восстановить работу <ArrowUpRight size={16} />
-                    </span>
-                  </button>
-                )}
-                <section className="devices-section">
-                  <div className="section-heading">
-                    <div>
-                      <h2>
-                        Ваши устройства<span>04</span>
-                      </h2>
-                    </div>
-                    <div className="room-filter" aria-label="Комнаты">
-                      {rooms.map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => setRoom(r)}
-                          className={room === r ? "selected" : ""}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="gallery-wrap">
-                    <div className="device-grid">
-                      {home
-                        ? Object.entries(home.devices)
-                            .filter(
-                              ([id]) =>
-                                room === "Все" ||
-                                home.metadata[id].room === room,
-                            )
-                            .map(([id, d], index) => {
-                              const spec = descriptions[id],
-                                on = !!d[spec.toggle],
-                                m = home.metadata[id];
-                              return (
-                                <SpotlightCard
-                                  key={id}
-                                  className={
-                                    "device-card " +
-                                    (d.overload_alarm ? "has-alarm" : "")
-                                  }
-                                  spotlightColor="rgba(238, 154, 98, 0.35)"
-                                  intensity={0.12}
-                                  borderGlow={0.3}
-                                  grain={0.04}
-                                  style={{
-                                    "--spotlight-card-surface":
-                                      "rgba(9,9,9,.94)",
-                                  }}
-                                >
-                                  <div className="device-card-top">
-                                    <span className="device-number">
-                                      0
-                                      {Object.keys(home.devices).indexOf(id) +
-                                        1}
-                                    </span>
-                                    <Switch
-                                      on={on}
-                                      disabled={!online}
-                                      label={
-                                        (on ? "Выключить " : "Включить ") +
-                                        m.name
-                                      }
-                                      onClick={() =>
-                                        command(
-                                          id,
-                                          spec.toggle,
-                                          on ? 0 : spec.on,
-                                        )
-                                      }
-                                    />
-                                  </div>
-                                  <button
-                                    className={
-                                      "product-image " +
-                                      (!on ? "device-off" : "")
-                                    }
-                                    onClick={() => setSelected(id)}
-                                    aria-label={"Настроить " + m.name}
-                                  >
-                                    {!reduce && index < 2 && <div className="photo-effect" aria-hidden="true"><EffectBoundary>{index === 0 ? <Dither waveColor={[0.38,0.25,0.18]} waveAmplitude={0.1} waveSpeed={0.025} pixelSize={3} enableMouseInteraction={false} dpr={0.5} disableAnimation={!!selected || !!settings || !!confirmation} /> : <DarkVeil color="#b18664" speed={0.12} quality={0.2} dpr={0.5} mouseInteraction={false} paused={!!selected || !!settings || !!confirmation} />}</EffectBoundary></div>}
-                                    <motion.img
-                                      src={`${base}images/${spec.image}.webp`}
-                                      alt={m.name}
-                                      initial={
-                                        reduce
-                                          ? false
-                                          : { opacity: 0, scale: 0.94 }
-                                      }
-                                      animate={{ opacity: 1, scale: 1 }}
-                                      transition={{
-                                        delay: index * 0.08,
-                                        duration: 0.7,
-                                      }}
-                                      whileHover={
-                                        reduce
-                                          ? {}
-                                          : {
-                                              scale: 1.035,
-                                              rotate:
-                                                spec.image === "lamp" ? -2 : 0,
-                                            }
-                                      }
-                                    />
-                                    <span className="image-grain" />
-                                  </button>
-                                  <div className="device-room">
-                                    <i className={on ? "lit" : ""} />
-                                    {m.room}
-                                    <span>
-                                      {d.overload_alarm
-                                        ? "Защита"
-                                        : on
-                                          ? "Включено"
-                                          : "Выключено"}
-                                    </span>
-                                  </div>
-                                  <div className="device-card-bottom">
-                                    <button
-                                      className="device-title"
-                                      onClick={() => setSelected(id)}
-                                    >
-                                      {m.name}
-                                      <small>{spec.sub}</small>
-                                    </button>
-                                    <span className="device-value">
-                                      <NumberValue
-                                        value={
-                                          id === "light_1" && !on
-                                            ? 0
-                                            : d[spec.signal]
-                                        }
-                                        decimals={id === "thermostat_1" ? 1 : 0}
-                                      />
-                                      <small>{spec.unit}</small>
-                                    </span>
-                                  </div>
-                                  <button
-                                    className="device-details-link"
-                                    onClick={() => setSelected(id)}
-                                    aria-label={"Параметры " + m.name}
-                                  >
-                                    <ArrowUpRight size={16} />
-                                  </button>
-                                </SpotlightCard>
-                              );
-                            })
-                        : Array.from({ length: 4 }, (_, i) => (
-                            <div className="device-skeleton" key={i} />
-                          ))}
-                    </div>
-                  </div>
-                </section>
-                <section className="lower-grid">
-                  <div>
-                    <div className="section-heading">
-                      <h2>Дом заботится сам</h2>
-                      <a href="#scenarios">
-                        Все сценарии <ArrowUpRight size={14} />
-                      </a>
-                    </div>
+                  </section>
+                  {alarm && (
                     <button
-                      className="automation-teaser"
-                      onClick={() => { location.hash = 'scenarios'; }}
+                      className="alarm-banner"
+                      onClick={() => setSelected("smart_plug_1")}
                     >
-                      <span className="workflow-symbol">
-                        <Workflow size={25} />
+                      <span>
+                        <ShieldCheck size={18} />
+                        Розетка отключена защитой
                       </span>
                       <span>
-                        <strong>
-                          {scenarios[0]?.name || "Ваш первый сценарий"}
-                        </strong>
-                        <small>
-                          {scenarios.length
-                            ? "Автоматизация повседневных забот"
-                            : "Свяжите устройства одним правилом"}
-                        </small>
+                        Восстановить работу <ArrowUpRight size={16} />
                       </span>
-                      <ChevronRight size={19} />
                     </button>
-                  </div>
-                  <div>
+                  )}
+                  <section className="devices-section">
                     <div className="section-heading">
-                      <h2>Последние события</h2>
-                      <a href="#history">
-                        История <ArrowUpRight size={14} />
-                      </a>
+                      <div>
+                        <h2>
+                          Устройства
+                          <span>
+                            {home
+                              ? String(
+                                  Object.keys(home.devices).length,
+                                ).padStart(2, "0")
+                              : "—"}
+                          </span>
+                        </h2>
+                      </div>
+                      <div className="room-segments">
+                        <RubberSegment
+                          items={rooms}
+                          value={room}
+                          onChange={setRoom}
+                          aria-label="Комнаты"
+                          size="md"
+                          trackColor="#111312"
+                          thumbColor="#534334"
+                          activeTextColor="#edf2eb"
+                          textColor="#a2aaa6"
+                        />
+                      </div>
                     </div>
-                    <Activity events={events} short />
-                  </div>
-                </section>
-              </>
+                    <div className="gallery-wrap">
+                      <div className="device-grid">
+                        {home
+                          ? Object.entries(home.devices)
+                              .filter(
+                                ([id]) =>
+                                  room === "Все" ||
+                                  home.metadata[id].room === room,
+                              )
+                              .map(([id, d], index) => {
+                                const spec = descriptions[id],
+                                  on = !!d[spec.toggle],
+                                  m = home.metadata[id];
+                                return (
+                                  <AnimatedContent
+                                    key={id}
+                                    distance={reduce ? 0 : 16}
+                                    duration={0.4}
+                                    delay={index * 0.04}
+                                    initialOpacity={reduce ? 1 : 0}
+                                  >
+                                    <SpotlightCard
+                                      className={
+                                        "device-card " +
+                                        (on ? "is-on " : "is-off ") +
+                                        (d.overload_alarm ? "has-alarm" : "")
+                                      }
+                                      spotlightColor="rgba(166, 189, 165, 0.16)"
+                                      intensity={0.12}
+                                      borderGlow={0.3}
+                                      grain={0}
+                                      style={{
+                                        "--spotlight-card-surface": "#111312",
+                                        "--device-tint":
+                                          {
+                                            smart_plug_1: "143, 174, 140",
+                                            light_1: "200, 164, 109",
+                                            thermostat_1: "151, 171, 185",
+                                            ventilation_1: "116, 170, 162",
+                                          }[id] || "143,174,140",
+                                      }}
+                                    >
+                                      <div className="device-card-top">
+                                        <span className="device-top-room">
+                                          <span
+                                            className={
+                                              "device-status-dot " +
+                                              (on ? "active" : "")
+                                            }
+                                          />
+                                          {m.room}
+                                        </span>
+                                        <Switch
+                                          on={on}
+                                          disabled={!online || !!pending[id]}
+                                          label={
+                                            (on ? "Выключить " : "Включить ") +
+                                            m.name
+                                          }
+                                          onClick={() =>
+                                            command(
+                                              id,
+                                              spec.toggle,
+                                              on ? 0 : spec.on,
+                                              false,
+                                            )
+                                          }
+                                        />
+                                      </div>
+                                      <button
+                                        className={
+                                          "product-image " +
+                                          (!on ? "device-off" : "")
+                                        }
+                                        onClick={() => setSelected(id)}
+                                        aria-label={"Настроить " + m.name}
+                                      >
+                                        <motion.img
+                                          src={`${base}images/${spec.image}.webp`}
+                                          alt={m.name}
+                                          initial={
+                                            reduce
+                                              ? false
+                                              : { opacity: 0, scale: 0.94 }
+                                          }
+                                          animate={{ opacity: 1, scale: 1 }}
+                                          transition={{
+                                            delay: index * 0.08,
+                                            duration: 0.7,
+                                          }}
+                                          whileHover={
+                                            reduce
+                                              ? {}
+                                              : {
+                                                  scale: 1.035,
+                                                  rotate:
+                                                    spec.image === "lamp"
+                                                      ? -2
+                                                      : 0,
+                                                }
+                                          }
+                                        />
+                                      </button>
+                                      <div className="device-room">
+                                        <i className={on ? "lit" : ""} />
+                                        {pending[id]
+                                          ? "Обновление…"
+                                          : operationStatus(id, d)}
+                                        <span>
+                                          {d.overload_alarm
+                                            ? "Защита"
+                                            : on
+                                              ? "Включено"
+                                              : "Выключено"}
+                                        </span>
+                                      </div>
+                                      <div className="device-card-bottom">
+                                        <button
+                                          className="device-title"
+                                          onClick={() => setSelected(id)}
+                                        >
+                                          {m.name}
+                                          <small>{spec.sub}</small>
+                                        </button>
+                                        <span className="device-value">
+                                          {(id === "thermostat_1" ||
+                                            id === "ventilation_1") && (
+                                            <span className="device-reading-label">
+                                              {id === "thermostat_1"
+                                                ? "Температура в комнате"
+                                                : "CO₂ в комнате"}
+                                              {!on && (
+                                                <span>
+                                                  Последнее измерение · датчик
+                                                  выключен
+                                                </span>
+                                              )}
+                                            </span>
+                                          )}
+                                          <NumberValue
+                                            value={d[spec.signal]}
+                                            decimals={
+                                              id === "thermostat_1" ? 1 : 0
+                                            }
+                                          />
+                                          <small>{spec.unit}</small>
+                                        </span>
+                                      </div>
+                                      <button
+                                        className="device-details-link"
+                                        onClick={() => setSelected(id)}
+                                        aria-label={"Параметры " + m.name}
+                                      >
+                                        <ArrowUpRight size={16} />
+                                      </button>
+                                    </SpotlightCard>
+                                  </AnimatedContent>
+                                );
+                              })
+                          : Array.from({ length: 4 }, (_, i) => (
+                              <div className="device-skeleton" key={i} />
+                            ))}
+                      </div>
+                    </div>
+                  </section>
+                  <HomeStatistics home={home} online={online} />
+                  <section className="lower-grid">
+                    <div>
+                      <div className="section-heading">
+                        <h2>
+                          Автоматизации{" "}
+                          <span>
+                            {home?.summary.active_scenarios ?? 0} активных
+                          </span>
+                        </h2>
+                        <a href="#scenarios">
+                          Все сценарии <ArrowUpRight size={14} />
+                        </a>
+                      </div>
+                      <div className="automation-list">
+                        {scenarios.length ? (
+                          scenarios.map((s) => (
+                            <div className="automation-row" key={s.id}>
+                              <span className="automation-icon">
+                                <Workflow size={20} />
+                              </span>
+                              <button
+                                className="automation-name"
+                                onClick={() => setEditor(s)}
+                              >
+                                <strong>{s.name}</strong>
+                                <small>
+                                  {s.enabled ? "Активен" : "Выключен"}
+                                </small>
+                              </button>
+                              <Switch
+                                on={s.enabled}
+                                disabled={!online || !!pending[s.id]}
+                                label={`Переключить ${s.name}`}
+                                onClick={() => toggleScenario(s)}
+                              />
+                              <button
+                                className="icon-button"
+                                aria-label={`Настроить ${s.name}`}
+                                onClick={() => setEditor(s)}
+                              >
+                                <ChevronRight size={18} />
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <button
+                            className="automation-empty"
+                            disabled={!home}
+                            onClick={() => setEditor({})}
+                          >
+                            <Plus size={22} />
+                            <strong>Создайте первую автоматизацию</strong>
+                            <span>Пусть устройства работают вместе</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="section-heading">
+                        <h2>Последние события</h2>
+                        <a href="#history">
+                          История <ArrowUpRight size={14} />
+                        </a>
+                      </div>
+                      <Activity
+                        events={events}
+                        metadata={home?.metadata}
+                        short
+                      />
+                    </div>
+                  </section>
+                </div>
+              </AnimatedContent>
             )}
             {page === "scenarios" && (
               <>
@@ -1028,91 +1156,124 @@ export default function App() {
                     Новый сценарий
                   </button>
                 </section>
-                <div className="scenario-grid">
-                  {scenarios.map((s) => (
-                    <SpotlightCard key={s.id} className="scenario-card">
-                      <div className="scenario-card-head">
-                        <Workflow size={24} />
-                        <Switch
-                          on={s.enabled}
-                          disabled={!online}
-                          label={"Переключить " + s.name}
-                          onClick={async () => {
-                            if (
-                              await ask(
-                                `${s.enabled ? "Отключить" : "Включить"} сценарий «${s.name}»?`,
-                              )
-                            )
-                              try {
-                                await api(`/api/scenarios/${s.id}/toggle`, {
-                                  enabled: !s.enabled,
-                                });
-                                refresh();
-                              } catch (e) {
-                                notify(e.message, true);
-                              }
-                          }}
+                <div className="scenario-deck">
+                  <CardSwap
+                    ref={scenarioDeck}
+                    width={460}
+                    height={560}
+                    cardDistance={40}
+                    verticalDistance={40}
+                    autoplay={false}
+                    parallax={0.15}
+                    skewAmount={2}
+                    intro={!reduce}
+                  >
+                    {scenarios.map((s) => (
+                      <Card key={s.id} className="scenario-card">
+                        <img
+                          className="scenario-preview"
+                          src={`${base}images/${s.id === "overload_protection" ? "scenario-overload.png" : `${descriptions[s.when.device]?.image || "plug"}.webp`}`}
+                          alt={`Превью сценария «${s.name}»`}
                         />
-                      </div>
-                      <h2>{s.name}</h2>
-                      <div className="rule-summary">
-                        <span>Если</span>
-                        <p>
-                          {meta(s.when.device)}
-                          <small>
-                            {signalTitle(s.when)} {s.when.operator}{" "}
-                            {s.when.value}
-                          </small>
-                        </p>
-                      </div>
-                      {s.do.map((a, i) => (
-                        <div className="rule-summary" key={i}>
-                          <span>Тогда</span>
+                        <div className="scenario-card-head">
+                          <Workflow size={24} />
+                          <Switch
+                            on={s.enabled}
+                            disabled={!online}
+                            label={"Переключить " + s.name}
+                            onClick={async () => {
+                              if (
+                                await ask(
+                                  `${s.enabled ? "Отключить" : "Включить"} сценарий «${s.name}»?`,
+                                )
+                              )
+                                try {
+                                  await api(`/api/scenarios/${s.id}/toggle`, {
+                                    enabled: !s.enabled,
+                                  });
+                                  refresh();
+                                } catch (e) {
+                                  notify(e.message, true);
+                                }
+                            }}
+                          />
+                        </div>
+                        <h2>{s.name}</h2>
+                        <div className="rule-summary">
+                          <span>Если</span>
                           <p>
-                            {meta(a.device)}
+                            {meta(s.when.device)}
                             <small>
-                              {signalTitle(a)} → {a.value}
+                              {signalTitle(s.when)} {s.when.operator}{" "}
+                              {s.when.value}
                             </small>
                           </p>
                         </div>
-                      ))}
-                      <div className="scenario-card-actions">
-                        <button
-                          className="secondary"
-                          onClick={() => setEditor(s)}
-                        >
-                          Изменить
-                        </button>
-                        <button
-                          className="text-button"
-                          onClick={async () => {
-                            if (await ask(`Удалить сценарий «${s.name}»?`))
-                              try {
-                                await api(
-                                  `/api/scenarios/${s.id}`,
-                                  null,
-                                  "DELETE",
-                                );
-                                refresh();
-                              } catch (e) {
-                                notify(e.message, true);
-                              }
-                          }}
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    </SpotlightCard>
-                  ))}
-                  <button
-                    className="add-scenario"
-                    disabled={!home}
-                    onClick={() => setEditor({})}
-                  >
-                    <Plus size={28} />
-                    <span>Создать сценарий</span>
-                    <small>Если событие — тогда действие</small>
-                  </button>
+                        {s.do.map((a, i) => (
+                          <div className="rule-summary" key={i}>
+                            <span>Тогда</span>
+                            <p>
+                              {meta(a.device)}
+                              <small>
+                                {signalTitle(a)} → {a.value}
+                              </small>
+                            </p>
+                          </div>
+                        ))}
+                        <div className="scenario-card-actions">
+                          <button
+                            className="secondary"
+                            onClick={() => setEditor(s)}
+                          >
+                            Изменить
+                          </button>
+                          <button
+                            className="text-button"
+                            onClick={async () => {
+                              if (await ask(`Удалить сценарий «${s.name}»?`))
+                                try {
+                                  await api(
+                                    `/api/scenarios/${s.id}`,
+                                    null,
+                                    "DELETE",
+                                  );
+                                  refresh();
+                                } catch (e) {
+                                  notify(e.message, true);
+                                }
+                            }}
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                      </Card>
+                    ))}
+                    <button
+                      className="add-scenario"
+                      disabled={!home}
+                      onClick={() => setEditor({})}
+                    >
+                      <Plus size={28} />
+                      <span>Создать сценарий</span>
+                    </button>
+                  </CardSwap>
+                  <div className="scenario-deck-controls">
+                    <span>
+                      {scenarios.length} сценариев · листайте карточки
+                    </span>
+                    <button
+                      className="secondary"
+                      onClick={() => scenarioDeck.current?.prev()}
+                    >
+                      Назад
+                    </button>
+                    <button
+                      className="secondary"
+                      onClick={() => scenarioDeck.current?.next()}
+                    >
+                      Далее
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -1122,7 +1283,6 @@ export default function App() {
                   <div>
                     <span className="home-location">Всегда в курсе</span>
                     <h1>Жизнь вашего дома.</h1>
-                    <p>Что произошло и почему — без лишнего шума.</p>
                   </div>
                 </section>
                 <div className="history-filters">
@@ -1152,7 +1312,7 @@ export default function App() {
         </AnimatePresence>
       </main>
       <footer>
-        <span className="footer-brand">powerguardian</span>
+        <span className="footer-brand">UjinFizteha</span>
         <span>
           <i />
           Эмуляторы Ujin OS
@@ -1169,27 +1329,24 @@ export default function App() {
             home={home}
             declarations={declarations}
             command={command}
+            busy={!!pending[selected]}
+            online={online}
           />
         </Modal>
       )}
       {editor && home && (
-        <Modal
-          title={editor.id ? "Изменить сценарий" : "Новый сценарий"}
+        <ScenarioSheet
+          item={editor}
+          home={home}
+          declarations={declarations}
           onClose={() => setEditor(null)}
-        >
-          <ScenarioEditor
-            item={editor}
-            home={home}
-            declarations={declarations}
-            notify={notify}
-            onSave={async (s) => {
-              await api("/api/scenarios", s);
-              setEditor(null);
-              refresh();
-              notify("Сценарий сохранён");
-            }}
-          />
-        </Modal>
+          onSave={async (s) => {
+            await api("/api/scenarios", s);
+            setEditor(null);
+            refresh();
+            notify("Сценарий сохранён");
+          }}
+        />
       )}
       {settings && (
         <Modal
