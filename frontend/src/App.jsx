@@ -26,6 +26,7 @@ import SpotlightCard from "./components/reactbits/SpotlightCard";
 import AnimatedContent from "./components/reactbits/AnimatedContent";
 import ScenarioSheet from "./components/ScenarioSheet";
 import HomeStatistics from "./components/HomeStatistics";
+import {descriptions,fallbackDescription,deviceActive,plural} from './components/deviceCatalog';
 import SquishSwitch from "./components/reactbits/SquishSwitch";
 import RubberSegment from "./components/reactbits/RubberSegment";
 import PillNav from "./components/reactbits/PillNav";
@@ -34,40 +35,7 @@ import DeviceGauge from "./components/DeviceGauge";
 import useAutoDeviceCommand from "./components/useAutoDeviceCommand";
 
 const base = import.meta.env.BASE_URL;
-const descriptions = {
-  smart_plug_1: {
-    image: "plug",
-    sub: "Энергия под контролем",
-    signal: "power_w",
-    unit: "Вт",
-    toggle: "power_switch",
-    on: 1,
-  },
-  light_1: {
-    image: "lamp",
-    sub: "Свет под настроение",
-    signal: "brightness",
-    unit: "%",
-    toggle: "lamp",
-    on: 1,
-  },
-  thermostat_1: {
-    image: "thermostat",
-    sub: "Ваша идеальная температура",
-    signal: "temperature",
-    unit: "°C",
-    toggle: "mode",
-    on: 3,
-  },
-  ventilation_1: {
-    image: "ventilation",
-    sub: "Свежий воздух каждый день",
-    signal: "co2",
-    unit: "ppm",
-    toggle: "mode",
-    on: 1,
-  },
-};
+
 async function api(path, body, method) {
   const response = await fetch(path, {
     method: method || (body ? "POST" : "GET"),
@@ -116,7 +84,8 @@ function operationStatus(id, state) {
       : state.fan_speed
         ? `Вентиляция · скорость ${state.fan_speed}`
         : "Вентилятор в ожидании";
-  return state[descriptions[id].toggle] ? "Включено" : "Выключено";
+  const spec=descriptions[id]||fallbackDescription;
+  return spec.status ? spec.status(state) : 'На связи';
 }
 class EffectBoundary extends Component {
   state = { failed: false };
@@ -245,7 +214,7 @@ function DeviceDetails({ id, home, declarations, command, busy, online }) {
   const auto = useAutoDeviceCommand(id, command, (signal) =>
     setValues((old) => ({ ...old, [signal]: state[signal] })),
   );
-  const spec = descriptions[id];
+  const spec = descriptions[id]||fallbackDescription;
   return (
     <>
       <div className="detail-hero">
@@ -364,7 +333,7 @@ function DeviceDetails({ id, home, declarations, command, busy, online }) {
                     type="submit"
                     disabled={busy || !online}
                   >
-                    {busy ? "Выполнение…" : "Сбросить защиту"}
+                    {busy ? "Выполнение…" : s.title}
                   </button>
                 )}
               </div>
@@ -905,8 +874,8 @@ function HomeApp() {
                                   home.metadata[id].room === room,
                               )
                               .map(([id, d], index) => {
-                                const spec = descriptions[id],
-                                  on = !!d[spec.toggle],
+                                const spec = descriptions[id]||fallbackDescription,
+                                  on = deviceActive(id,d),
                                   m = home.metadata[id];
                                 return (
                                   <AnimatedContent
@@ -920,7 +889,7 @@ function HomeApp() {
                                       className={
                                         "device-card " +
                                         (on ? "is-on " : "is-off ") +
-                                        (d.overload_alarm ? "has-alarm" : "")
+                                        (d[spec.alarm] ? "has-alarm" : "")
                                       }
                                       spotlightColor="rgba(166, 189, 165, 0.16)"
                                       intensity={0.12}
@@ -947,7 +916,7 @@ function HomeApp() {
                                           />
                                           {m.room}
                                         </span>
-                                        <Switch
+                                        {spec.toggle ? <Switch
                                           on={on}
                                           disabled={!online || !!pending[id]}
                                           label={
@@ -962,7 +931,7 @@ function HomeApp() {
                                               false,
                                             )
                                           }
-                                        />
+                                        /> : <span className="device-kind-label">{home.metadata[id].family === 'intercom' ? 'Домофон' : 'На связи'}</span>}
                                       </div>
                                       <button
                                         className={
@@ -1036,9 +1005,7 @@ function HomeApp() {
                                           )}
                                           <NumberValue
                                             value={d[spec.signal]}
-                                            decimals={
-                                              id === "thermostat_1" ? 1 : 0
-                                            }
+                                            decimals={spec.decimals||0}
                                           />
                                           <small>{spec.unit}</small>
                                         </span>
@@ -1360,7 +1327,7 @@ function HomeApp() {
               <strong>{online ? "Дом на связи" : "Нет соединения"}</strong>
               <small>{location.origin}</small>
             </div>
-            <span>4 эмулятора</span>
+            <span>{home?Object.keys(home.devices).length:'—'} эмуляторов</span>
           </div>
           <h3>Попробовать в лаборатории</h3>
           <p className="settings-description">

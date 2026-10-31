@@ -1457,6 +1457,7 @@ input::placeholder {
   .room-filter {
     width: 100%;
     gap: 4px;
+    flex-wrap: wrap;
   }
   .room-filter button {
     font-size: 10px;

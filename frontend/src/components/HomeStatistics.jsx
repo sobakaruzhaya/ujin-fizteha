@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import MagicBento from "./reactbits/MagicBento";
 import "./HomeStatistics.css";
+import {deviceActive} from './deviceCatalog';
 
 const number = (value, digits = 0) =>
   Number(value).toLocaleString("ru-RU", {
@@ -148,7 +149,7 @@ export default function HomeStatistics({ home, online }) {
     if (!home) return [];
     const devices = Object.entries(home.devices);
     const on = devices.filter(
-      ([, d]) => Number(d.mode ?? d.power_switch ?? d.lamp ?? 0) !== 0,
+      ([id,d]) => deviceActive(id,d),
     ).length;
     const peak = history.length
       ? Math.max(...history.map((p) => p.power_w))
@@ -248,7 +249,7 @@ export default function HomeStatistics({ home, online }) {
                   <span>
                     {home.metadata[id]?.room}
                     {"co2" in d ? " · CO₂" : " · температура"}
-                    {!d.mode && ' · последнее измерение'}
+                    {'mode' in d && !d.mode && ' · последнее измерение'}
                   </span>
                 </div>
               ))}

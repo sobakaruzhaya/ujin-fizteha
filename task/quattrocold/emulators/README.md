@@ -75,10 +75,18 @@ python -c "import ws_client; print(ws_client.fetch_wss_address(
 | `devices/ventilation.py` | **Вентиляция** (приточка): CO2/PM2.5, авто-режим по цели |
 | `devices/fire.py` | **ПОЖС**: задымлённость, порог, тампер, самотест |
 | `devices/light.py` | **Свет/реле**: яркость, энергия, авто-выключение |
+| `devices/temp_sensor.py` | **Датчик температуры/влажности**: калибровка, батарея, комфортная температура |
+| `devices/smart_tv.py` | **Умный телевизор**: источники, приложения, громкость, авто-выключение |
+| `devices/fridge.py` | **Холодильник**: две камеры, компрессор, режимы, защита от открытой двери |
+| `devices/kettle.py` | **Чайник**: нагрев до цели, поддержание тепла, сухой ход |
+| `devices/stove.py` | **Плита**: четыре конфорки, таймер, сухой нагрев, перегрев |
+| `devices/oven.py` | **Духовка**: режимы, предварительный нагрев, таймер, дверь |
+| `devices/intercom.py` | **Домофон**: вызов, ответ, открытие двери, авто-завершение |
 | `live_loop.py` | pull-цикл приёма команд платформы (get-device-info → task → исполнение → подтверждение) |
 | `ws_client.py` | WS-клиент по контракту МП (auth/setValue/эхо) + `WsDeviceHub` поверх FSM |
 | `tests/test_devices.py` | 24 теста конечных автоматов, клиента, команды по HTTP |
 | `tests/test_families.py` | 10 тестов новых семейств + групп `signal.group` |
+| `tests/test_home_devices.py` | 52 теста домашних устройств: ТВ, датчик, холодильник, чайник, плита, духовка, домофон, защиты пожарного датчика и протечки |
 | `tests/test_ws_client.py` | 8 тестов WS-протокола и хаба (офлайн) |
 | `tests/test_client_publish.py` | 3 теста payload'а публикаций (рудимент wire_value) |
 | `tests/test_new_device.py` | 5 тестов генератора new_device.py |
@@ -87,7 +95,7 @@ python -c "import ws_client; print(ws_client.fetch_wss_address(
 | `tests/test_provision_live.py` | 4 теста идемпотентности `--live` (cos/комплы/резиденты, сетьзаглушена) |
 | `tests/test_live_loop.py` | 4 теста дедупа задач pull-цикла (task_dt) |
 
-Итого 71 unittest, все офлайн. Оговорка: живой WS-зонд (`ws_client.probe`)
+Итого 110 unittest, все офлайн. Оговорка: живой WS-зонд (`ws_client.probe`)
 требует `pip install websockets` — единственная внешняя либа, импортируется
 лениво; ядро и тесты от неё не зависят.
 

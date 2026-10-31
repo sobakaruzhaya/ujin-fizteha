@@ -17,3 +17,8 @@ soft rim lighting, realistic matte materials, and no text, logos or interface.
   circular concentric front grille, rounded corners, three-quarter floating perspective.
 
 WebP conversion: ImageMagick, maximum 900×900 pixels, quality 88.
+
+Дополнительные иконки домашних устройств (`temp_sensor`, `leak`, `hub`, `fire`,
+`counter`, `tv`, `fridge`, `kettle`, `stove`, `oven`, `intercom`) нарисованы
+локально в едином линейном стиле на чёрном фоне и собраны ImageMagick. Они не
+изображают конкретные модели и нужны только для карточек демо-стенда.
