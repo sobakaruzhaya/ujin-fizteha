@@ -16,6 +16,7 @@ class InternalSensor:
         self.hub = hub
         self.wet = False
         self.online = True
+        self.battery = 100.0
 
     def set_wet(self, wet: bool) -> None:
         self.wet = wet
@@ -42,7 +43,12 @@ class LeakHub(Device):
                                "property", sensors, "", 0, sensors))
         self.add_signal(Signal("sensors_total", "Датчиков всего", "counter", "r",
                                "system", sensors))
-        self.add_signal(Signal("mute", "Заглушить сирену", "switch", "rw", "capability", 0))
+        self.add_signal(Signal("battery", "Минимальный заряд датчиков", "counter", "r",
+                               "property", 100, "%", 0, 100))
+        self.add_signal(Signal("low_battery", "Низкий заряд датчика", "list", "r",
+                               "property", 0, layout={0: "нет", 1: "есть"}, zero_safe=True))
+        self.add_signal(Signal("mute", "Заглушить сирену", "switch", "rw", "capability", 0,
+                               zero_safe=True))
         self.add_signal(Signal("siren", "Сирена", "list", "r", "property", 0,
                                layout={0: "выкл", 1: "звучит"}))
 
@@ -64,7 +70,10 @@ class LeakHub(Device):
             self.log(f"[{self.model}] внутренняя коммутация: датчик {idx} {kind}={value}")
         wet_mask = "".join("1" if s.wet else "0" for s in self.sensors)
         online = sum(1 for s in self.sensors if s.online)
+        battery = min((s.battery for s in self.sensors), default=100.0)
         self.set_value("leak", 1 if any(s.wet for s in self.sensors) else 0)
         self.set_value("leak_sensors", wet_mask)
         self.set_value("sensors_online", online)
+        self.set_value("battery", round(battery, 1))
+        self.set_value("low_battery", 1 if battery <= 15 else 0)
         self.set_value("siren", self._siren_should())

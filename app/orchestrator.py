@@ -19,6 +19,17 @@ from devices.smart_plug import SmartPlug
 from devices.light import Light
 from devices.thermostat import Thermostat
 from devices.ventilation import Ventilation
+from devices.leak_sensor import LeakSensor
+from devices.leak_hub import LeakHub
+from devices.fire import FireDetector
+from devices.counter import Counter
+from devices.temp_sensor import TempSensor
+from devices.smart_tv import SmartTV
+from devices.fridge import Fridge
+from devices.kettle import Kettle
+from devices.stove import Stove
+from devices.oven import Oven
+from devices.intercom import Intercom
 
 OPERATORS = {'>': operator.gt, '<': operator.lt, '>=': operator.ge,
              '<=': operator.le, '==': operator.eq, '!=': operator.ne}
@@ -35,10 +46,12 @@ class Orchestrator:
         self._stop = threading.Event()
         self._thread = None
         self._make_devices()
-        self.scenarios = {'overload_protection': {
-            'id': 'overload_protection', 'name': 'Защита от перегрузки', 'enabled': True,
-            'when': {'device': 'smart_plug_1', 'signal': 'power_w', 'operator': '>', 'value': 2000},
-            'do': [{'device': 'smart_plug_1', 'signal': 'power_switch', 'value': 0}]}}
+        self.scenarios = {
+            'overload_protection': {
+                'id': 'overload_protection', 'name': 'Защита от перегрузки', 'enabled': True,
+                'when': {'device': 'smart_plug_1', 'signal': 'power_w', 'operator': '>', 'value': 2000},
+                'do': [{'device': 'smart_plug_1', 'signal': 'power_switch', 'value': 0}]},
+        }
         if self.storage_path and self.storage_path.exists():
             try:
                 saved = json.loads(self.storage_path.read_text(encoding='utf-8'))
@@ -54,13 +67,35 @@ class Orchestrator:
             'smart_plug_1': SmartPlug(serial='smart_plug_1', logger=self._log),
             'light_1': Light(serial='light_1', logger=self._log),
             'thermostat_1': Thermostat(serial='thermostat_1', logger=self._log),
-            'ventilation_1': Ventilation(serial='ventilation_1', logger=self._log)}
+            'ventilation_1': Ventilation(serial='ventilation_1', logger=self._log),
+            'temp_sensor_1': TempSensor(serial='temp_sensor_1', logger=self._log),
+            'leak_1': LeakSensor(serial='leak_1', logger=self._log),
+            'hub_1': LeakHub(serial='hub_1', logger=self._log),
+            'fire_1': FireDetector(serial='fire_1', logger=self._log),
+            'counter_1': Counter(serial='counter_1', logger=self._log, resource='electricity'),
+            'tv_1': SmartTV(serial='tv_1', logger=self._log),
+            'fridge_1': Fridge(serial='fridge_1', logger=self._log),
+            'kettle_1': Kettle(serial='kettle_1', logger=self._log),
+            'stove_1': Stove(serial='stove_1', logger=self._log),
+            'oven_1': Oven(serial='oven_1', logger=self._log),
+            'intercom_1': Intercom(serial='intercom_1', logger=self._log)}
         self.device = self.devices['smart_plug_1']  # compatibility with Telegram/MCP
         self.metadata = {
             'smart_plug_1': {'name': 'Умная розетка', 'room': 'Кухня', 'family': 'smart_plug', 'icon': 'plug'},
             'light_1': {'name': 'Основной свет', 'room': 'Гостиная', 'family': 'light', 'icon': 'light'},
             'thermostat_1': {'name': 'Термостат', 'room': 'Гостиная', 'family': 'thermostat', 'icon': 'climate'},
-            'ventilation_1': {'name': 'Приточная вентиляция', 'room': 'Спальня', 'family': 'ventilation', 'icon': 'wind'}}
+            'ventilation_1': {'name': 'Приточная вентиляция', 'room': 'Спальня', 'family': 'ventilation', 'icon': 'wind'},
+            'temp_sensor_1': {'name': 'Датчик температуры', 'room': 'Спальня', 'family': 'temp_sensor', 'icon': 'temp_sensor'},
+            'leak_1': {'name': 'Датчик протечки', 'room': 'Ванная', 'family': 'leak', 'icon': 'leak'},
+            'hub_1': {'name': 'Хаб протечки', 'room': 'Ванная', 'family': 'hub', 'icon': 'hub'},
+            'fire_1': {'name': 'Пожарный датчик', 'room': 'Кухня', 'family': 'fire', 'icon': 'fire'},
+            'counter_1': {'name': 'Счётчик электроэнергии', 'room': 'Прихожая', 'family': 'counter', 'icon': 'counter'},
+            'tv_1': {'name': 'Умный телевизор', 'room': 'Гостиная', 'family': 'smart_tv', 'icon': 'tv'},
+            'fridge_1': {'name': 'Холодильник', 'room': 'Кухня', 'family': 'fridge', 'icon': 'fridge'},
+            'kettle_1': {'name': 'Чайник', 'room': 'Кухня', 'family': 'kettle', 'icon': 'kettle'},
+            'stove_1': {'name': 'Плита', 'room': 'Кухня', 'family': 'stove', 'icon': 'stove'},
+            'oven_1': {'name': 'Духовка', 'room': 'Кухня', 'family': 'oven', 'icon': 'oven'},
+            'intercom_1': {'name': 'Домофон', 'room': 'Прихожая', 'family': 'intercom', 'icon': 'intercom'}}
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -286,9 +321,35 @@ class Orchestrator:
                 self._apply_command('light_1', 'lamp', 1, 'lab')
                 self._apply_command('light_1', 'brightness', 35, 'lab')
                 self._apply_command('thermostat_1', 'target_temp', 23, 'lab')
+            elif preset == 'comfort':
+                self.devices['temp_sensor_1'].set_temperature(19.0)
+                self._apply_command('thermostat_1', 'mode', 1, 'lab')
+                self._apply_command('thermostat_1', 'target_temp', 23, 'lab')
+            elif preset == 'leak':
+                self.devices['hub_1'].sensor(1).set_wet(True)
+                self._apply_command('smart_plug_1', 'power_switch', 0, 'lab')
+            elif preset == 'fire':
+                self.devices['fire_1'].set_smoke(80)
+                self._apply_command('smart_plug_1', 'power_switch', 0, 'lab')
+            elif preset == 'intercom':
+                self.devices['intercom_1'].ring()
+                self._apply_command('light_1', 'lamp', 1, 'lab')
+            elif preset == 'kitchen':
+                self._apply_command('kettle_1', 'power', 1, 'lab')
+                self._apply_command('stove_1', 'burner_1', 5, 'lab')
             else:
                 raise ValueError('Неизвестный эксперимент')
-            self.add_event('demo_started', message={'overload': 'Тест перегрузки: нагрузка 2400 Вт', 'co2': 'Тест воздуха: CO₂ 1500 ppm', 'evening': 'Вечер: приглушённый свет и температура 23 °C'}[preset])
+            messages = {
+                'overload': 'Тест перегрузки: нагрузка 2400 Вт',
+                'co2': 'Тест воздуха: CO₂ 1500 ppm',
+                'evening': 'Вечер: приглушённый свет и температура 23 °C',
+                'comfort': 'Датчик температуры: 19 °C, термостат включит нагрев',
+                'leak': 'Протечка: датчик сработал, нагрузка отключена',
+                'fire': 'Пожар: задымление 80 %, тревога',
+                'intercom': 'Звонок в дверь: вызов и свет в прихожей',
+                'kitchen': 'Кухня: чайник и конфорка включены',
+            }
+            self.add_event('demo_started', message=messages[preset])
             return {'status': 'started'}
 
     def simulate(self, seconds=10, scenario=None):

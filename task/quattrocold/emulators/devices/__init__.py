@@ -9,6 +9,13 @@ from .ventilation import Ventilation
 from .fire import FireDetector
 from .light import Light
 from .smart_plug import SmartPlug
+from .temp_sensor import TempSensor
+from .smart_tv import SmartTV
+from .fridge import Fridge
+from .kettle import Kettle
+from .stove import Stove
+from .oven import Oven
+from .intercom import Intercom
 
 REGISTRY = {
     "leak": LeakSensor,
@@ -21,4 +28,11 @@ REGISTRY = {
     "fire": FireDetector,
     "light": Light,
     "smart_plug": SmartPlug,
+    "temp_sensor": TempSensor,
+    "smart_tv": SmartTV,
+    "fridge": Fridge,
+    "kettle": Kettle,
+    "stove": Stove,
+    "oven": Oven,
+    "intercom": Intercom,
 }

@@ -16,12 +16,21 @@ class LeakSensor(Device):
                                layout={0: "нет", 1: "протечка"}))
         self.add_signal(Signal("battery", "Батарея", "counter", "r", "property",
                                100, "%", 0, 100))
+        self.add_signal(Signal("low_battery", "Низкий заряд", "list", "r", "property",
+                               0, layout={0: "нет", 1: "низкий"}, zero_safe=True))
+        self.add_signal(Signal("last_seen", "Последняя связь", "counter", "r", "property", 0))
         self.add_signal(Signal("tamper", "Вскрытие", "list", "r", "property", 0,
-                               layout={0: "закрыт", 1: "вскрыт"}))
+                               layout={0: "закрыт", 1: "вскрыт"}, zero_safe=True))
         self.add_signal(Signal("self_test", "Самотест", "push_time", "w", "capability", 0))
 
     def set_wet(self, wet: bool) -> None:
         self.pending_wet = wet
+
+    def set_battery(self, value: float) -> None:
+        self.set_value("battery", max(0.0, min(100.0, float(value))))
+
+    def set_tamper(self, value: bool) -> None:
+        self.set_value("tamper", 1 if value else 0)
 
     def on_command(self, name: str, value) -> None:
         if name == "self_test" and value:
@@ -35,3 +44,5 @@ class LeakSensor(Device):
             self.log(f"[{self.model}] протечка={wet_now}")
         battery = round(self.signals["battery"].value - self.battery_drain * dt, 2)
         self.set_value("battery", self.clamp("battery", battery))
+        self.set_value("low_battery", 1 if self.signals["battery"].value <= 15 else 0)
+        self.set_value("last_seen", self.tick_count)

@@ -69,6 +69,55 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("state", result)
         self.assertEqual(before["devices"]["smart_plug_1"], self.o.state()["devices"]["smart_plug_1"])
 
+    def test_home_device_inventory(self):
+        expected = {
+            'smart_plug_1', 'light_1', 'thermostat_1', 'ventilation_1',
+            'temp_sensor_1', 'leak_1', 'hub_1', 'fire_1', 'counter_1',
+            'tv_1', 'fridge_1', 'kettle_1', 'stove_1', 'oven_1', 'intercom_1'}
+        state = self.o.state()
+        self.assertTrue(expected.issubset(state['devices']))
+        self.assertTrue(expected.issubset(state['metadata']))
+        declarations = self.o.declarations()
+        self.assertIn('fridge_temp', {s['name'] for s in declarations['fridge_1']})
+        self.assertIn('call_state', {s['name'] for s in declarations['intercom_1']})
+
+    def test_commands_route_to_new_devices(self):
+        self.o.request_command('tv_1', 'power', 1, False)
+        self.o.request_command('kettle_1', 'target_temp', 70, False)
+        state = self.o.state()['devices']
+        self.assertEqual(state['tv_1']['power'], 1)
+        self.assertEqual(state['kettle_1']['target_temp'], 70)
+
+    def test_comfort_demo_uses_temp_sensor(self):
+        self.o.experiment('comfort')
+        self.o.step()
+        state = self.o.state()['devices']
+        self.assertLess(state['temp_sensor_1']['temperature'], 21)
+        self.assertEqual(state['thermostat_1']['mode'], 1)
+        self.assertEqual(state['thermostat_1']['target_temp'], 23)
+        self.assertEqual(state['thermostat_1']['output'], 1)
+
+    def test_leak_demo_sounds_hub_and_cuts_load(self):
+        self.o.request_command('smart_plug_1', 'power_switch', 1, False)
+        self.o.experiment('leak')
+        self.o.step()
+        state = self.o.state()['devices']
+        self.assertEqual(state['hub_1']['leak'], 1)
+        self.assertEqual(state['hub_1']['siren'], 1)
+        self.assertEqual(state['smart_plug_1']['power_switch'], 0)
+
+    def test_fire_demo_raises_alarm(self):
+        self.o.experiment('fire')
+        self.o.step()
+        self.assertEqual(self.o.state()['devices']['fire_1']['alarm'], 1)
+
+    def test_intercom_demo_rings_and_turns_on_light(self):
+        self.o.experiment('intercom')
+        self.o.step()
+        state = self.o.state()['devices']
+        self.assertEqual(state['intercom_1']['call_state'], 1)
+        self.assertEqual(state['light_1']['lamp'], 1)
+
     def test_cross_device_rule_and_single_edge(self):
         self.o.create_scenario({'name': 'Свежий воздух', 'when': {
             'device': 'ventilation_1', 'signal': 'co2', 'operator': '>', 'value': 1000},

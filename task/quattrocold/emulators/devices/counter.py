@@ -37,11 +37,12 @@ class Counter(Device):
             self.add_signal(Signal("flow", "Расход сейчас", "graph", "r", "property", 0.0, f"{unit}/ч"))
         self.add_signal(Signal("battery", "Батарея", "graph", "r", "property", 98, "%"))
         self.add_signal(Signal("online", "Связь", "list", "r", "property", 1,
-                               layout={0: "нет", 1: "есть"}))
+                               layout={0: "нет", 1: "есть"}, zero_safe=True))
         self.add_signal(Signal("report_period", "Период отчёта, с", "counter", "rw",
                                "setting", 60, "с", 10, 3600))
         self.add_signal(Signal("load_relay", "Реле нагрузки", "switch", "rw",
-                               "capability", 1, layout={0: "отключено", 1: "включено"}))
+                               "capability", 1, layout={0: "отключено", 1: "включено"},
+                               zero_safe=True))
         self._since_report = 0
 
     def on_command(self, name, value) -> None:

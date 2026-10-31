@@ -9,7 +9,7 @@ test("React home: imagery, commands, overload recovery, rules and mobile", async
   await expect(
     page.getByRole("button", { name: "Настроить Умная розетка", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".product-image img")).toHaveCount(4);
+  await expect(page.locator(".product-image img")).toHaveCount(15);
   for (const img of await page.locator(".product-image img").all())
     expect(
       await img.evaluate((e) => e.complete && e.naturalWidth > 0),
@@ -49,7 +49,7 @@ test("React home: imagery, commands, overload recovery, rules and mobile", async
     page.getByRole("dialog", { name: "Подтвердите действие" }),
   ).not.toBeVisible();
   await device
-    .getByRole("button", { name: "Сбросить защиту", exact: true })
+    .getByRole("button", { name: "Выполнить", exact: true })
     .click();
   await page
     .getByRole("dialog", { name: "Подтвердите действие" })
@@ -92,7 +92,7 @@ test("React home: imagery, commands, overload recovery, rules and mobile", async
   ).toBeVisible();
   await page.getByRole("link", { name: "Мой дом", exact: true }).click();
   await page.getByRole("button", { name: "Кухня", exact: true }).click();
-  await expect(page.locator(".product-image")).toHaveCount(1);
+  await expect(page.locator(".product-image")).toHaveCount(6);
   await page.getByRole("button", { name: "Все", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
