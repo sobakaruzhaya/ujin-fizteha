@@ -297,3 +297,26 @@ Android Phone / Android TV / Telegram / MCP
 - не переписывать orchestrator под Android;
 - не подключать физическую Wi‑Fi-розетку в рамках этой задачи;
 - не требовать Google Play публикации.
+
+## Задача 7. Завершить Telegram и MCP
+
+Код и конфигурация готовы, ветка `feature/telegram-mcp-smart-home` запушена.
+Осталось проверить внешнюю интеграцию и настроить постоянный запуск.
+
+- [ ] На машине с доступом к `api.telegram.org` выполнить
+      `python app/run.py --telegram-check`; ожидается `Bot: @...` и тестовое
+      сообщение в чат `1192942330`.
+- [ ] Запустить `python app/run.py --telegram` и проверить `/start`, `/status`,
+      `/devices`.
+- [ ] Настроить автозапуск backend + Telegram (systemd или Docker) с
+      `EnvironmentFile=.env`.
+- [ ] Убедиться, что MCP-клиент запускает `app/run.py --mcp` с
+      `POWER_GUARDIAN_API_URL=http://127.0.0.1:8787`; `get_health` должен
+      вернуть `transport: http` и 16 tools.
+- [ ] При необходимости заменить `"command": "python"` в `.mcp.json` на
+      абсолютный путь к Python из venv.
+- [ ] После проверки перевыпустить Telegram-токен в BotFather и обновить
+      `.env`.
+- [ ] Опционально: зарегистрировать меню команд через `setMyCommands`.
+
+`.env` в репозиторий не коммитить; реальные токены хранить только локально.
