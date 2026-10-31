@@ -1,1 +1,15 @@
-{"mcpServers":{"shadcn":{"command":"npx","args":["-y","shadcn@latest","mcp"]}}}
+{
+  "mcpServers": {
+    "shadcn": {
+      "command": "npx",
+      "args": ["-y", "shadcn@latest", "mcp"]
+    },
+    "power-guardian": {
+      "command": "python",
+      "args": ["app/run.py", "--mcp"],
+      "env": {
+        "POWER_GUARDIAN_API_URL": "http://127.0.0.1:8787"
+      }
+    }
+  }
+}

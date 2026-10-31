@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "web", "dist"))
 CONTENT_TYPES = {
@@ -97,19 +97,31 @@ class ControlServer:
                     "demo": {"overload_load_w": 2400, "default_load_w": 900},
                 })
 
+            @staticmethod
+            def query_limit(query, default, maximum=1000):
+                try:
+                    value = int(query.get("limit", [default])[0])
+                except (TypeError, ValueError):
+                    return default
+                return max(1, min(value, maximum))
+
             def do_GET(self):
-                path = urlparse(self.path).path
+                parsed = urlparse(self.path)
+                path = parsed.path
+                query = parse_qs(parsed.query)
                 if path == "/api/state":
                     return self.send_json(owner.orchestrator.state())
                 if path == "/api/devices":
                     return self.send_json(owner.orchestrator.declarations())
                 if path == "/api/events":
-                    return self.send_json(owner.orchestrator.events_since())
+                    limit = self.query_limit(query, 50, 200)
+                    return self.send_json(owner.orchestrator.events_since(limit))
                 if path == "/api/scenarios":
                     return self.send_json(owner.orchestrator.list_scenarios())
                 if path == "/api/history":
+                    limit = self.query_limit(query, 300, 1000)
                     with owner.orchestrator.lock:
-                        return self.send_json(list(owner.orchestrator.history))
+                        return self.send_json(list(owner.orchestrator.history[-limit:]))
                 if path == "/api/health":
                     return self.send_json({"status": "ok"})
                 if path == "/api/config":

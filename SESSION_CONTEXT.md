@@ -1,5 +1,16 @@
 # Контекст сессии Power Guardian
 
+## Telegram и MCP: актуальное состояние
+
+Telegram и MCP работают через общий `app/home_client.py`, поэтому web UI, бот и
+AI-агенты используют один control plane и одну политику подтверждений. Telegram
+поддерживает `/status`, `/devices`, `/device`, `/events`, `/scenarios`,
+`/scenario_on|off`, `/demo`, `/reset`, `/health` и inline-подтверждение команд.
+MCP (SDK v2) предоставляет 16 инструментов, ресурсы `home://*` и двухшаговое
+подтверждение команд. По умолчанию MCP подключается к запущенному HTTP backend
+через `POWER_GUARDIAN_API_URL`; `--local` создаёт изолированный дом. Подробности и
+команды запуска — в `README_AI.md`. Тесты: `python -m unittest discover -s app/tests`.
+
 Этот файл — handoff для продолжения работы над проектом на другом устройстве или в новой сессии ChatGPT/Codex.
 
 ## Последняя переделка: центр умного дома
