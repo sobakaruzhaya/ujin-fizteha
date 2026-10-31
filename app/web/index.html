@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <title>Power Guardian</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-mode="phone" data-modes="phone tv">
+  <div id="connection" class="connection" role="status" aria-live="polite">
+    <span class="connection-dot" aria-hidden="true"></span>
+    <span id="connection-text">Подключение к control plane…</span>
+  </div>
+
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="bolt" aria-hidden="true">⚡</span>
+        <div>
+          <h1>Power Guardian</h1>
+          <p id="mode-label">Режим телефона</p>
+        </div>
+      </div>
+      <div class="statusline">
+        <span id="updated" class="muted">—</span>
+        <span id="online-dot" class="dot" aria-hidden="true"></span>
+      </div>
+    </header>
+
+    <section id="alarm" class="alarm" role="alert" hidden>
+      <span class="alarm-icon" aria-hidden="true">⚠</span>
+      <div>
+        <strong>Перегрузка: нагрузка отключена</strong>
+        <p id="alarm-text">Сработала защита. Уменьшите нагрузку и сбросьте защиту, чтобы включить реле.</p>
+      </div>
+    </section>
+
+    <section class="hero card">
+      <div class="hero-main">
+        <span class="label">Текущая мощность</span>
+        <div class="power"><span id="power-w">0</span><span class="unit">Вт</span></div>
+        <span id="relay-state" class="pill off">ВЫКЛ</span>
+      </div>
+      <div class="metrics">
+        <div class="metric">
+          <span class="label">Накопленная энергия</span>
+          <span id="energy-kwh" class="value">0.000 <small>кВт·ч</small></span>
+        </div>
+        <div class="metric">
+          <span class="label">Лимит мощности</span>
+          <span id="limit-w" class="value">2000 <small>Вт</small></span>
+        </div>
+        <div class="metric">
+          <span class="label">Защита</span>
+          <span id="protection" class="value good">Нет</span>
+        </div>
+        <div class="metric">
+          <span class="label">Напряжение / ток</span>
+          <span id="voltage-current" class="value">230 В / 0 А</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="chain card" aria-label="Цепочка решения">
+      <span class="label">Сигнал → правило → действие</span>
+      <div class="chain-row">
+        <span id="chain-signal" class="chain-step">Мощность 0 Вт</span>
+        <span class="chain-arrow" aria-hidden="true">→</span>
+        <span id="chain-rule" class="chain-step">Лимит 2000 Вт</span>
+        <span class="chain-arrow" aria-hidden="true">→</span>
+        <span id="chain-action" class="chain-step">Реле включено</span>
+      </div>
+    </section>
+
+    <section class="actions card">
+      <h2>Управление розеткой</h2>
+      <div class="button-grid">
+        <button id="power-on" class="action primary" type="button">Включить</button>
+        <button id="power-off" class="action" type="button">Выключить</button>
+        <button id="reset-protection" class="action" type="button">Сбросить защиту</button>
+        <button id="demo-start" class="action warning" type="button">Запустить перегрузку</button>
+        <button id="demo-reset" class="action" type="button">Сбросить демо</button>
+      </div>
+      <div class="limit-row">
+        <label for="limit-input">Новый лимит мощности, Вт</label>
+        <div class="limit-controls">
+          <input id="limit-input" type="number" min="100" max="3500" step="50" inputmode="numeric">
+          <button id="apply-limit" class="action" type="button">Применить лимит</button>
+        </div>
+      </div>
+      <p class="hint">Опасные команды выполняются только после подтверждения.</p>
+    </section>
+
+    <section class="events card">
+      <div class="section-head">
+        <h2>Журнал событий</h2>
+        <span id="events-count" class="muted">0</span>
+      </div>
+      <ul id="events" class="event-list">
+        <li class="muted">Загрузка…</li>
+      </ul>
+    </section>
+
+    <section class="scenarios card">
+      <div class="section-head">
+        <h2>Сценарии</h2>
+        <span id="scenarios-count" class="muted">0</span>
+      </div>
+      <ul id="scenarios" class="scenario-list">
+        <li class="muted">Загрузка…</li>
+      </ul>
+    </section>
+  </main>
+
+  <div id="confirm" class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" hidden>
+    <div class="modal-card">
+      <h2 id="confirm-title">Подтвердить команду</h2>
+      <p id="confirm-summary">Команда изменит состояние розетки.</p>
+      <p class="hint">Подтверждение действует 60 секунд.</p>
+      <div class="modal-actions">
+        <button id="confirm-cancel" class="action" type="button">Отмена</button>
+        <button id="confirm-ok" class="action primary" type="button">Подтвердить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

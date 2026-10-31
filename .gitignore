@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.py[cod]
+.venv/
+.venv-mcp/
+*.log
+
+# Hackathon credential packet: never commit.
+task/quattrocold/доступы.json
+token.txt
+
+# Original hackathon archive (contains credential packet).
+task/quattrocold.zip

@@ -1,0 +1,2 @@
+# Python 3.11+ environment for the MCP adapter.
+mcp>=2,<3
