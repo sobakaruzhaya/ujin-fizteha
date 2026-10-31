@@ -12,7 +12,7 @@ button,input,select,textarea { font-family:inherit; }
 .header .pill-nav { width:auto; }
 .header .pill-nav nav { margin:0; align-self:auto; gap:0; }
 .header .pill-nav a { padding:0; border-radius:999px; font-size:16px; color:inherit; display:inline-flex; }
-.header .pill-nav .pill-nav__item { padding:0 20px; }
+.header .pill-nav .pill-nav__item,.header .pill-nav .pill-nav__ink-item { padding:0 20px; font-size:16px; }
 .header .pill-nav .pill-nav__row { padding:12px 18px; }
 .connection,.home-location,.hero-status,.room-tabs button,.footer { font-size:13px; }
 .section-heading h2 { font-size:22px; }
@@ -66,7 +66,7 @@ dialog { border-radius:24px; width:min(580px,calc(100vw - 32px)); padding:28px; 
   .main-pill-nav { order:3; flex-basis:100%; display:flex; justify-content:center; }
   .header-right { margin-left:auto; }
   .header .pill-nav { position:relative; width:auto; }
-  .header .pill-nav .pill-nav__item { padding:0 14px; font-size:15px; }
+  .header .pill-nav .pill-nav__item,.header .pill-nav .pill-nav__ink-item { padding:0 11px; font-size:14px; }
   .device-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .device-card.spotlight-card { padding:14px; }
   .device-title { font-size:16px; }
@@ -75,4 +75,7 @@ dialog { border-radius:24px; width:min(580px,calc(100vw - 32px)); padding:28px; 
   .detail-controls form > label { max-width:45%; font-size:14px; }
   .detail-controls form > div { min-width:0; }
   .home-cubes { opacity:.4; }
+}
+@media(max-width:380px) {
+  .header .pill-nav .pill-nav__item,.header .pill-nav .pill-nav__ink-item { padding:0 8px; font-size:12px; }
 }

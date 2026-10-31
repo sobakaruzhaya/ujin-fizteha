@@ -18,7 +18,11 @@ soft rim lighting, realistic matte materials, and no text, logos or interface.
 
 WebP conversion: ImageMagick, maximum 900×900 pixels, quality 88.
 
-Дополнительные иконки домашних устройств (`temp_sensor`, `leak`, `hub`, `fire`,
-`counter`, `tv`, `fridge`, `kettle`, `stove`, `oven`, `intercom`) нарисованы
-локально в едином линейном стиле на чёрном фоне и собраны ImageMagick. Они не
-изображают конкретные модели и нужны только для карточек демо-стенда.
+Additional device photos (`temp_sensor`, `leak`, `hub`, `fire`, `counter`, `tv`,
+`fridge`, `kettle`, `stove`, `oven`, `intercom`) were generated with the built-in
+image_gen tool, using `plug.webp` and `lamp.webp` as style references. They replace
+the original line-art placeholders. The products are illustrative, unbranded
+physical device designs photographed against a black studio backdrop.
+
+These additional files are optimized with FFmpeg/libwebp at quality 88 and at
+most 900×900 pixels. The complete generation prompts are in `PHOTO_PROMPTS.md`.

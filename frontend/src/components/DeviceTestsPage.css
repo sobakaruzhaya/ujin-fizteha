@@ -1,0 +1,380 @@
+.device-tests-page {
+  padding: 42px 0 20px;
+}
+.tests-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 26px;
+}
+.tests-intro h1 {
+  font-size: 42px;
+  line-height: 1.15;
+  letter-spacing: -1px;
+  margin: 18px 0 12px;
+  font-weight: 400;
+}
+.tests-intro p {
+  color: #96978f;
+  font-size: 15px;
+  margin: 0;
+  line-height: 1.6;
+}
+.tests-main-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.tests-main-actions button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 12px 17px;
+}
+.tests-mode-note {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  border: 1px solid #edac821c;
+  background: #edac8207;
+  border-radius: 15px;
+  padding: 18px 20px;
+  margin-bottom: 22px;
+  color: #edac82;
+}
+.tests-mode-note strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+}
+.tests-mode-note span {
+  display: block;
+  color: #a5a195;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 5px;
+}
+.tests-mode-note > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.tests-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.tests-summary > div {
+  padding: 18px 22px;
+  border: 1px solid #ffffff0c;
+  border-radius: 15px;
+  background: #141611;
+}
+.tests-summary span {
+  display: block;
+  color: #96978f;
+  font-size: 13px;
+}
+.tests-summary strong {
+  display: block;
+  font-size: 30px;
+  font-weight: 400;
+  color: #e8e5dd;
+  margin-top: 8px;
+}
+.tests-summary .has-failures strong {
+  color: #e5a185;
+}
+.tests-progress {
+  border: 1px solid #ffffff10;
+  border-radius: 12px;
+  padding: 15px 18px;
+  margin-bottom: 24px;
+  background: #171914;
+}
+.tests-progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: #c4beb1;
+}
+.tests-progress strong {
+  font-weight: 400;
+  color: #edac82;
+}
+.tests-progress progress {
+  display: block;
+  width: 100%;
+  height: 5px;
+  border: 0;
+  border-radius: 6px;
+  margin-top: 12px;
+  accent-color: #edac82;
+  overflow: hidden;
+}
+.tests-progress progress::-webkit-progress-bar {
+  background: #ffffff0a;
+}
+.tests-progress progress::-webkit-progress-value {
+  background: #edac82;
+  transition: width 0.2s;
+}
+.tests-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.tests-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tests-filters button {
+  padding: 9px 13px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 9px;
+  color: #96978f;
+  font-size: 13px;
+}
+.tests-filters button[aria-pressed="true"] {
+  background: #29261e;
+  color: #edc9aa;
+  border-color: #ffffff10;
+}
+.tests-toolbar > button {
+  font-size: 12px;
+}
+.tests-device-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.test-device-card {
+  min-width: 0;
+  background: linear-gradient(145deg, #191b17, #10130f);
+  padding: 22px;
+  border-radius: 20px;
+  border: 1px solid #ffffff10;
+}
+.test-device-card.status-passed {
+  border-color: #a6b89830;
+}
+.test-device-card.status-failed {
+  border-color: #d58a6655;
+}
+.test-device-card.status-running {
+  border-color: #edac8250;
+}
+.test-device-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.test-device-heading > img {
+  width: 66px;
+  height: 66px;
+  object-fit: contain;
+  flex: none;
+  border-radius: 12px;
+  mix-blend-mode: screen;
+}
+.test-device-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+.test-device-heading > div > span {
+  font-size: 12px;
+  color: #96978f;
+}
+.test-device-heading h2 {
+  font-size: 18px;
+  line-height: 1.4;
+  margin: 5px 0 0;
+  font-weight: 400;
+}
+.test-result-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: none;
+  padding: 6px 9px;
+  border-radius: 7px;
+  border: 1px solid #ffffff10;
+  color: #96978f;
+  font-size: 11px;
+}
+.test-result-badge.passed {
+  color: #bbc9a9;
+  background: #a6b8980c;
+}
+.test-result-badge.failed {
+  color: #e7ae92;
+  background: #e7ae920b;
+}
+.test-result-badge.running {
+  color: #edac82;
+}
+.test-description {
+  color: #a9a498;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 17px 0;
+}
+.test-device-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.test-device-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  min-height: 42px;
+  font-size: 13px;
+}
+.test-device-actions > span {
+  font-size: 12px;
+  color: #96978f;
+}
+.test-check-details {
+  margin-top: 18px;
+  border-top: 1px solid #ffffff0c;
+}
+.test-check-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: #c7bead;
+  padding-top: 15px;
+  cursor: pointer;
+  list-style: none;
+}
+.test-check-details summary::-webkit-details-marker {
+  display: none;
+}
+.test-check-details[open] summary svg {
+  transform: rotate(180deg);
+}
+.test-check-details ul {
+  list-style: none;
+  margin: 15px 0 0;
+  padding: 0;
+}
+.test-check-details li {
+  display: flex;
+  gap: 10px;
+  padding: 9px 0;
+  line-height: 1.5;
+}
+.test-check-details li > svg {
+  flex: none;
+  margin-top: 2px;
+  color: #a6b898;
+}
+.test-check-details li.check-failed > svg {
+  color: #e7ae92;
+}
+.test-check-details li strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: #ddd8cd;
+}
+.test-check-details li span {
+  display: block;
+  font-size: 11px;
+  color: #96978f;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.test-finished-at {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #817f75;
+  margin-top: 16px;
+}
+.test-error {
+  color: #e7ae92;
+  line-height: 1.6;
+  font-size: 13px;
+}
+.tests-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  padding: 40px;
+  border: 1px dashed #ffffff17;
+  border-radius: 16px;
+  color: #96978f;
+  font-size: 14px;
+  text-align: center;
+}
+@media (max-width: 1000px) {
+  .tests-device-grid {
+    grid-template-columns: 1fr;
+  }
+  .tests-intro {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .tests-main-actions {
+    width: 100%;
+  }
+}
+@media (max-width: 720px) {
+  .device-tests-page {
+    padding-top: 28px;
+  }
+  .tests-intro h1 {
+    font-size: 32px;
+  }
+  .tests-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .tests-summary > div {
+    padding: 16px;
+  }
+  .test-device-card {
+    padding: 18px;
+  }
+  .test-device-heading {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .test-device-heading h2 {
+    font-size: 17px;
+  }
+  .test-device-heading > img {
+    width: 54px;
+    height: 54px;
+  }
+  .test-result-badge {
+    margin-left: auto;
+  }
+  .tests-mode-note {
+    padding: 16px;
+  }
+}
+@media (max-width: 380px) {
+  .test-device-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

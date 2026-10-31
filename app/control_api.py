@@ -5,6 +5,10 @@ import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+try:
+    from .device_tests import catalog as test_catalog, run as run_device_tests
+except ImportError:  # python app/run.py
+    from device_tests import catalog as test_catalog, run as run_device_tests
 
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "web", "dist"))
 CONTENT_TYPES = {
@@ -113,6 +117,8 @@ class ControlServer:
                     return self.send_json(owner.orchestrator.state())
                 if path == "/api/devices":
                     return self.send_json(owner.orchestrator.declarations())
+                if path == '/api/device-tests':
+                    return self.send_json(test_catalog(owner.orchestrator))
                 if path == "/api/events":
                     limit = self.query_limit(query, 50, 200)
                     return self.send_json(owner.orchestrator.events_since(limit))
@@ -145,6 +151,10 @@ class ControlServer:
                 path = urlparse(self.path).path
                 try:
                     body = self.read_json()
+                    if path == '/api/device-tests':
+                        if not isinstance(body, dict):
+                            raise ValueError('Ожидается объект с параметрами проверки')
+                        return self.send_json(run_device_tests(owner.orchestrator, body.get('device')))
                     if path == "/api/scenarios":
                         return self.send_json(owner.orchestrator.create_scenario(body), 201)
                     if path.startswith("/api/scenarios/") and path.endswith("/toggle"):

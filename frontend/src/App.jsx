@@ -26,6 +26,8 @@ import SpotlightCard from "./components/reactbits/SpotlightCard";
 import AnimatedContent from "./components/reactbits/AnimatedContent";
 import ScenarioSheet from "./components/ScenarioSheet";
 import HomeStatistics from "./components/HomeStatistics";
+import DeviceTestsPage from "./components/DeviceTestsPage";
+import ScenarioTemplates from "./components/ScenarioTemplates";
 import {
   descriptions,
   fallbackDescription,
@@ -497,7 +499,7 @@ function HomeApp() {
     [events, setEvents] = useState([]);
   const [online, setOnline] = useState(false),
     [page, setPage] = useState(
-      ["home", "scenarios", "history"].includes(location.hash.slice(1))
+      ["home", "scenarios", "history", "tests"].includes(location.hash.slice(1))
         ? location.hash.slice(1)
         : "home",
     );
@@ -553,7 +555,9 @@ function HomeApp() {
   useEffect(() => {
     const fn = () =>
       setPage(
-        ["home", "scenarios", "history"].includes(location.hash.slice(1))
+        ["home", "scenarios", "history", "tests"].includes(
+          location.hash.slice(1),
+        )
           ? location.hash.slice(1)
           : "home",
       );
@@ -712,6 +716,7 @@ function HomeApp() {
               { label: "Мой дом", href: "#home" },
               { label: "Сценарии", href: "#scenarios" },
               { label: "История", href: "#history" },
+              { label: "Тесты", href: "#tests" },
             ]}
             activeHref={`#${page}`}
             size="lg"
@@ -1123,6 +1128,7 @@ function HomeApp() {
                 </div>
               </AnimatedContent>
             )}
+            {page === "tests" && <DeviceTestsPage />}
             {page === "scenarios" && (
               <>
                 <section className="page-intro">
@@ -1135,14 +1141,28 @@ function HomeApp() {
                     </h1>
                     <p>Устройства работают вместе по вашим правилам.</p>
                   </div>
-                  <button
-                    className="primary"
-                    disabled={!home}
-                    onClick={() => setEditor({})}
-                  >
-                    <Plus size={16} />
-                    Новый сценарий
-                  </button>
+                  <div className="scenario-intro-actions">
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        document.getElementById("scenario-templates")?.scrollIntoView({
+                          behavior: reduce ? "instant" : "smooth",
+                        });
+                        document.getElementById("templates-title")?.focus({ preventScroll: true });
+                      }}
+                    >
+                      <Workflow size={16} />
+                      Шаблоны
+                    </button>
+                    <button
+                      className="primary"
+                      disabled={!home}
+                      onClick={() => setEditor({})}
+                    >
+                      <Plus size={16} />
+                      Новый сценарий
+                    </button>
+                  </div>
                 </section>
                 <div className="scenario-deck">
                   <CardSwap
@@ -1263,6 +1283,12 @@ function HomeApp() {
                     </button>
                   </div>
                 </div>
+                <ScenarioTemplates
+                  home={home}
+                  declarations={declarations}
+                  scenarios={scenarios}
+                  onSelect={setEditor}
+                />
               </>
             )}
             {page === "history" && (

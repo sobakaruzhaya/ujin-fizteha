@@ -1,0 +1,114 @@
+[
+  {
+    "key": "overload",
+    "category": "Безопасность",
+    "description": "Если мощность розетки выше 2000 Вт — отключить питание.",
+    "scenario": {
+      "name": "Защита от перегрузки",
+      "enabled": true,
+      "when": { "device": "smart_plug_1", "signal": "power_w", "operator": ">", "value": 2000 },
+      "do": [{ "device": "smart_plug_1", "signal": "power_switch", "value": 0 }]
+    }
+  },
+  {
+    "key": "leak",
+    "category": "Безопасность",
+    "description": "При протечке отключить питание умной розетки.",
+    "scenario": {
+      "name": "Отключение при протечке",
+      "enabled": true,
+      "when": { "device": "leak_1", "signal": "leak", "operator": "==", "value": 1 },
+      "do": [{ "device": "smart_plug_1", "signal": "power_switch", "value": 0 }]
+    }
+  },
+  {
+    "key": "fire",
+    "category": "Безопасность",
+    "description": "При пожарной тревоге выключить розетку, чайник, духовку и все конфорки.",
+    "scenario": {
+      "name": "Отключение техники при пожаре",
+      "enabled": true,
+      "when": { "device": "fire_1", "signal": "alarm", "operator": "==", "value": 1 },
+      "do": [
+        { "device": "smart_plug_1", "signal": "power_switch", "value": 0 },
+        { "device": "kettle_1", "signal": "power", "value": 0 },
+        { "device": "oven_1", "signal": "power", "value": 0 },
+        { "device": "stove_1", "signal": "burner_1", "value": 0 },
+        { "device": "stove_1", "signal": "burner_2", "value": 0 },
+        { "device": "stove_1", "signal": "burner_3", "value": 0 },
+        { "device": "stove_1", "signal": "burner_4", "value": 0 }
+      ]
+    }
+  },
+  {
+    "key": "fresh-air",
+    "category": "Климат",
+    "description": "Если CO₂ выше 1000 ppm — включить автоматическую вентиляцию с целью 800 ppm.",
+    "scenario": {
+      "name": "Свежий воздух",
+      "enabled": true,
+      "when": { "device": "ventilation_1", "signal": "co2", "operator": ">", "value": 1000 },
+      "do": [
+        { "device": "ventilation_1", "signal": "co2_target", "value": 800 },
+        { "device": "ventilation_1", "signal": "mode", "value": 1 }
+      ]
+    }
+  },
+  {
+    "key": "warm-room",
+    "category": "Климат",
+    "description": "Если в гостиной ниже 20 °C — включить обогрев до 22 °C.",
+    "scenario": {
+      "name": "Комфортное тепло",
+      "enabled": true,
+      "when": { "device": "thermostat_1", "signal": "temperature", "operator": "<", "value": 20 },
+      "do": [
+        { "device": "thermostat_1", "signal": "target_temp", "value": 22 },
+        { "device": "thermostat_1", "signal": "mode", "value": 1 }
+      ]
+    }
+  },
+  {
+    "key": "cool-room",
+    "category": "Климат",
+    "description": "Если в гостиной выше 26 °C — включить охлаждение до 24 °C.",
+    "scenario": {
+      "name": "Прохлада в гостиной",
+      "enabled": true,
+      "when": { "device": "thermostat_1", "signal": "temperature", "operator": ">", "value": 26 },
+      "do": [
+        { "device": "thermostat_1", "signal": "target_temp", "value": 24 },
+        { "device": "thermostat_1", "signal": "mode", "value": 2 }
+      ]
+    }
+  },
+  {
+    "key": "cinema",
+    "category": "Комфорт",
+    "description": "При включении телевизора включить свет на 25% яркости.",
+    "scenario": {
+      "name": "Киновечер",
+      "enabled": true,
+      "when": { "device": "tv_1", "signal": "power", "operator": "==", "value": 1 },
+      "do": [
+        { "device": "light_1", "signal": "brightness", "value": 25 },
+        { "device": "light_1", "signal": "lamp", "value": 1 }
+      ]
+    }
+  },
+  {
+    "key": "doorbell",
+    "category": "Комфорт",
+    "description": "При звонке домофона выключить звук телевизора и включить свет на 100%.",
+    "scenario": {
+      "name": "Звонок в дверь",
+      "enabled": true,
+      "when": { "device": "intercom_1", "signal": "call_state", "operator": "==", "value": 1 },
+      "do": [
+        { "device": "tv_1", "signal": "mute", "value": 1 },
+        { "device": "light_1", "signal": "brightness", "value": 100 },
+        { "device": "light_1", "signal": "lamp", "value": 1 }
+      ]
+    }
+  }
+]
