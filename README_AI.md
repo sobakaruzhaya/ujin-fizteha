@@ -67,19 +67,22 @@ npm run mcp:check
 ## Telegram
 
 Бот работает через long polling и общий control plane, поэтому видит те же
-устройства, сценарии и события, что web UI. Запуск вместе с HTTP API:
+устройства, сценарии и события, что web UI. `app/run.py` автоматически читает
+`.env` из корня репозитория (реальные переменные окружения имеют приоритет).
+Создайте файл и укажите токен с разрешёнными chat id:
 
 ```bash
-export TELEGRAM_BOT_TOKEN='...'
-export TELEGRAM_ALLOWED_CHAT_IDS='123456789,987654321'
-python app/run.py --telegram
+cp .env.example .env
+# TELEGRAM_BOT_TOKEN=...
+# TELEGRAM_ALLOWED_CHAT_IDS=123456789
+chmod 600 .env
+python app/run.py --telegram-check   # getMe + тестовое сообщение
+python app/run.py --telegram         # backend + бот
 ```
 
 Или отдельным процессом против уже запущенного backend:
 
 ```bash
-export TELEGRAM_BOT_TOKEN='...'
-export TELEGRAM_ALLOWED_CHAT_IDS='123456789'
 python app/run.py --telegram --api-url http://127.0.0.1:8787
 ```
 
@@ -98,8 +101,7 @@ python app/run.py --telegram --api-url http://127.0.0.1:8787
 Команды устройств всегда проходят двухфазно: бот сначала показывает summary и
 кнопку «Подтвердить», затем вызывает `confirm`. Уведомления об авариях и
 срабатываниях сценариев отправляются только в разрешённые чаты. Реальные токены
-не добавляйте в git: `.env.example` — только шаблон, автоматического чтения
-`.env` нет.
+не добавляйте в git: `.env` исключён `.gitignore`, `.env.example` — только шаблон.
 
 ## MCP умного дома
 

@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 try:
@@ -17,6 +21,76 @@ except ImportError:  # script mode: python app/run.py
     from home_client import HttpHomeClient, LocalHomeClient
     from orchestrator import Orchestrator
     from telegram_bot import TelegramBot
+
+
+def load_dotenv(path=None):
+    """Load KEY=VALUE pairs from .env without overriding the real environment."""
+    path = Path(path or os.environ.get(
+        "POWER_GUARDIAN_ENV", Path(__file__).resolve().parent.parent / ".env"))
+    if not path.is_file():
+        return {}
+    loaded = {}
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key or not key.replace("_", "").isalnum() or key[0].isdigit():
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        if key not in os.environ:
+            os.environ[key] = value
+            loaded[key] = value
+    return loaded
+
+
+def telegram_api(token, method, payload=None, timeout=20):
+    url = f"https://api.telegram.org/bot{token}/{method}"
+    data = urllib.parse.urlencode(payload or {}).encode("utf-8")
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, data=data),
+                                    timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            return json.loads(exc.read().decode("utf-8"))
+        except ValueError:
+            return {"ok": False, "description": f"Telegram HTTP {exc.code}"}
+    except (urllib.error.URLError, OSError) as exc:
+        return {"ok": False, "description": f"network error: {exc}"}
+
+
+def telegram_check():
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    raw = os.environ.get("TELEGRAM_ALLOWED_CHAT_IDS", "")
+    chats = [item.strip() for item in raw.split(",") if item.strip()]
+    if not token or not chats:
+        print("Set TELEGRAM_BOT_TOKEN and TELEGRAM_ALLOWED_CHAT_IDS in .env",
+              file=sys.stderr)
+        return 2
+    me = telegram_api(token, "getMe")
+    if not me.get("ok"):
+        print(f"Telegram getMe failed: {me.get('description')}", file=sys.stderr)
+        return 1
+    bot = me["result"]
+    print(f"Bot: @{bot.get('username')} ({bot.get('id')})")
+    sent = telegram_api(token, "sendMessage", {
+        "chat_id": chats[0],
+        "text": "✅ Power Guardian подключён. Отправьте /start.",
+    })
+    if not sent.get("ok"):
+        print(f"Telegram sendMessage failed: {sent.get('description')}",
+              file=sys.stderr)
+        return 1
+    print(f"Test message sent to chat {chats[0]}")
+    return 0
 
 
 def build_parser():
@@ -32,12 +106,17 @@ def build_parser():
                              "(default: $POWER_GUARDIAN_API_URL)")
     parser.add_argument("--local", action="store_true",
                         help="ignore POWER_GUARDIAN_API_URL and use an in-process home")
+    parser.add_argument("--telegram-check", action="store_true",
+                        help="validate the bot token and send one test message")
     return parser
 
 
 def main(argv=None):
+    load_dotenv()
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.telegram_check:
+        return telegram_check()
     api_url = None if args.local else (args.api_url or os.environ.get("POWER_GUARDIAN_API_URL"))
     if api_url and not (args.mcp or args.telegram):
         parser.error("--api-url requires --mcp or --telegram")
@@ -91,4 +170,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
