@@ -20,7 +20,8 @@ class FakeApi:
         return {"ok": True, "result": []}
 
     def sent(self):
-        return [payload for method, payload in self.calls if method == "sendMessage"]
+        return [dict(payload, text=payload.get('text', payload.get('caption', '')))
+                for method, payload in self.calls if method in ('sendMessage', 'sendPhoto')]
 
     def last_text(self):
         return self.sent()[-1]["text"]
@@ -59,19 +60,12 @@ class TelegramBotTest(unittest.TestCase):
     def test_devices_keyboard(self):
         self.message("/devices")
         payload = self.api.sent()[-1]
-        self.assertIn("smart_plug_1", payload["reply_markup"])
-        self.assertIn("light_1", payload["reply_markup"])
+        self.assertIn("Умная розетка", payload["reply_markup"])
+        self.assertIn("Основной свет", payload["reply_markup"])
 
-    def test_command_requires_confirmation_and_executes(self):
+    def test_device_command_executes_immediately_like_the_web(self):
         self.callback("cmd:smart_plug_1:power_switch:1")
         text = self.api.last_text()
-        self.assertIn("Подтвердите", text)
-        keyboard = json.loads(self.api.sent()[-1]["reply_markup"])["inline_keyboard"]
-        confirm_data = keyboard[0][0]["callback_data"]
-        self.assertTrue(confirm_data.startswith("confirm:"))
-        self.assertEqual(self.orchestrator.state()["devices"]["smart_plug_1"]["power_switch"], 0)
-
-        self.callback(confirm_data, callback_id="cb-2")
         self.assertIn("выполнена", self.api.last_text().lower())
         self.assertEqual(self.orchestrator.state()["devices"]["smart_plug_1"]["power_switch"], 1)
 

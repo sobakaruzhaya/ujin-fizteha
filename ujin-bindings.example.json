@@ -1,0 +1,14 @@
+{
+  "light": {
+    "local_id": "light_1",
+    "signal_prefix": "integrations_devices_",
+    "signals": {}
+  },
+  "thermostat": {
+    "local_id": "thermostat_1",
+    "signal_prefix": "integrations_devices_",
+    "signals": {}
+  },
+  "counter": { "local_id": "counter_1" },
+  "leak": { "local_id": "leak_1" }
+}

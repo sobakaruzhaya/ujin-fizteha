@@ -453,6 +453,9 @@ button:disabled {
 .detail-controls label {
   color: #b2bcb5;
 }
+.detail-light-switch { display:flex; align-items:center; gap:14px; margin-left:auto; }
+.detail-light-switch > span { color:#b2bcb5; font-size:14px; min-width:88px; text-align:right; }
+.detail-light-switch .squish-switch-root { flex-shrink:0; }
 .detail-hero {
   background: radial-gradient(ellipse at 20% 50%, #edac8213, transparent 70%);
 }

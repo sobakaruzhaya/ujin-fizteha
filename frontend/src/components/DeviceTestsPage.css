@@ -1,6 +1,26 @@
 .device-tests-page {
   padding: 42px 0 20px;
 }
+.tests-mode-tabs { display:flex; flex-wrap:wrap; gap:6px; padding-top:28px; }
+.tests-mode-tabs button { padding:12px 18px; color:#a5a195; border:1px solid #ffffff10; background:#ffffff04; border-radius:12px; font-size:15px; min-height:44px; }
+.tests-mode-tabs button[aria-pressed="true"] { color:#edc9aa; border-color:#edac8235; background:#29261e; }
+.test-case-symbol { width:66px; height:66px; display:grid; place-items:center; flex:none; color:#edac82; background:#edac820a; border-radius:12px; }
+.test-device-heading > .test-case-symbol { flex:none; }
+.test-case-expectation { padding:14px 0 18px; margin-bottom:15px; border-top:1px solid #ffffff0c; }
+.test-case-expectation > strong { display:block; font-size:12px; font-weight:400; color:#c9bcaa; }
+.test-case-expectation p { font-size:13px; line-height:1.65; color:#a5a195; margin:7px 0 10px; }
+.test-case-expectation > span { font-size:11px; color:#edac82; }
+.test-case-expectation p.test-case-note { color:#d3b69d; margin:12px 0 0; padding:12px; background:#edac8208; border-radius:10px; }
+.test-reaction-timeline { margin-top:17px; display:grid; gap:18px; }
+.test-reaction-stage { border-left:2px solid #edac8233; padding-left:12px; }
+.test-reaction-stage h3 { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:13px; font-weight:400; color:#edc9aa; line-height:1.5; margin:0 0 10px; }
+.test-reaction-stage h3 > span { color:#96978f; font-size:11px; white-space:nowrap; }
+.test-reaction-stage dl { margin:0; }
+.test-reaction-stage dl > div { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid #ffffff08; }
+.test-reaction-stage dt { font-size:12px; color:#d4cfc2; }
+.test-reaction-stage dt small { display:block; font-size:10px; color:#96978f; margin-top:4px; }
+.test-reaction-stage dd { font-size:13px; color:#e8e5dd; margin:0; text-align:right; overflow-wrap:anywhere; }
+.test-stand-rules { color:#a5a195; font-size:12px; line-height:1.6; margin:16px 0 0; }
 .tests-intro {
   display: flex;
   justify-content: space-between;
@@ -229,6 +249,7 @@
   line-height: 1.6;
   margin: 17px 0;
 }
+.test-view-trace { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:44px; padding:10px 14px; margin-top:14px; color:#edc9aa; background:#edac8208; border:1px solid #edac8225; border-radius:10px; font-size:13px; }
 .test-device-actions {
   display: flex;
   align-items: center;

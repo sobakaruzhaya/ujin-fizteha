@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UjinFizteha · API</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#10130f;color:#e6e3da}*{box-sizing:border-box}body{max-width:1120px;margin:0 auto;padding:36px 24px}header{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}h1{font-size:30px;font-weight:500;margin:0 0 12px}p{color:#aaa89c;line-height:1.7}a{color:#edb38b}nav{display:flex;gap:20px}main{margin-top:28px;display:grid;gap:14px}input,textarea,button{font:inherit;border-radius:9px;border:1px solid #ffffff22;background:#1b1f17;color:inherit;padding:12px}button{cursor:pointer}button:disabled{opacity:.5}textarea{display:block;width:100%;min-height:140px;font:13px/1.6 ui-monospace,monospace;resize:vertical}input{width:100%}#search{margin-top:18px}details{background:#171b14;border:1px solid #ffffff14;border-radius:12px;overflow:hidden}summary{cursor:pointer;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px;list-style:none}summary code{overflow-wrap:anywhere}summary span{color:#a9ad9f;font-size:14px}.method{font-size:11px;letter-spacing:.07em;padding:5px 8px;border-radius:6px;background:#2c3825;color:#c1d5a8}.method.write{background:#3a2d21;color:#edb38b}.operation{padding:0 18px 18px}.operation label{display:block;font-size:13px;color:#b9baad;margin:14px 0 8px}.operation button{margin-top:14px;background:#edb38b;color:#17140f}.operation pre{max-height:500px;overflow:auto;background:#0d100b;padding:16px;border-radius:9px;font:12px/1.7 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.result-status{font-size:13px;color:#b6c5a5;margin-left:12px}.error{color:#edb38b}footer{margin-top:30px;color:#8e9386;font-size:13px}.tag{margin-left:auto}button:focus-visible,summary:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid #edb38b;outline-offset:3px}@media(max-width:600px){body{padding:24px 16px}summary{gap:10px}.tag{display:none}h1{font-size:25px}}
+</style>
+<header><div><h1>UjinFizteha API</h1><p>Устройства, сценарии, статистика, тесты и Ujin — общий дом с веб-версией и Telegram.</p></div><nav><a href="/web/">Открыть дом</a><a href="/api/openapi.json" download="ujinfizteha-openapi.json">OpenAPI JSON</a></nav></header>
+<p>Выберите метод, заполните параметры и выполните запрос. Аварийные тесты и симуляции изолированы. Команды устройств, сценарии и лабораторные эксперименты изменяют общий дом.</p>
+<label for="search">Найти метод</label><input id="search" type="search" placeholder="Устройства, сценарии, тесты…">
+<main id="operations" aria-label="Методы API"><p role="status">Загрузка схемы…</p></main>
+<footer id="version"></footer>
+<script>
+const root=document.getElementById('operations');
+function element(tag,text,className){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;}
+function label(text,field){const node=element('label',text);field.id=crypto.randomUUID();node.htmlFor=field.id;return node;}
+async function load(){
+ const response=await fetch('/api/openapi.json');if(!response.ok)throw Error('Не удалось загрузить OpenAPI');
+ const schema=await response.json();root.replaceChildren();
+ document.getElementById('version').textContent=`OpenAPI ${schema.openapi} · UjinFizteha ${schema.info.version} · MCP: http://127.0.0.1:8788/mcp`;
+ for(const [path,methods] of Object.entries(schema.paths))for(const [method,operation] of Object.entries(methods)){
+  const block=element('details'),summary=element('summary');
+  block.dataset.search=[path,method,operation.summary,...operation.tags].join(' ').toLowerCase();
+  summary.append(element('strong',method.toUpperCase(),'method'+(method==='get'?'':' write')),element('code',path),element('span',operation.summary),element('span',operation.tags[0],'tag'));
+  const panel=element('div',undefined,'operation');
+  if(operation.description)panel.append(element('p',operation.description));
+  const url=element('input');url.value=path;url.spellcheck=false;panel.append(label('Путь запроса (подставьте ID вместо {параметров})',url),url);
+  const query=(operation.parameters||[]).filter(p=>p.in==='query');
+  if(query.length)url.value+='?'+query.map(p=>encodeURIComponent(p.name)+'='+encodeURIComponent(p.schema.default??'')).join('&');
+  const media=operation.requestBody?.content?.['application/json'];let body;
+  if(media){body=element('textarea');body.value=JSON.stringify(media.example||{},null,2);body.spellcheck=false;panel.append(label('Тело JSON',body),body);}
+  const submit=element('button','Выполнить запрос');submit.type='button';
+  const status=element('span','','result-status');status.setAttribute('role','status');
+  const output=element('pre');output.hidden=true;output.setAttribute('aria-label','Ответ API');
+  submit.addEventListener('click',async()=>{
+   submit.disabled=true;status.textContent='Выполняется…';output.hidden=false;
+   try{
+    const target=new URL(url.value,location.origin);
+    if(target.origin!==location.origin||!target.pathname.startsWith('/api'))throw Error('Укажите путь локального API');
+    if(/[{}]/.test(target.pathname)||/%7B|%7D/i.test(target.pathname))throw Error('Подставьте ID в путь запроса');
+    const options={method:method.toUpperCase(),headers:{Accept:'application/json'},signal:AbortSignal.timeout(30000)};
+    if(body){options.headers['Content-Type']='application/json';options.body=JSON.stringify(JSON.parse(body.value));}
+    const reply=await fetch(target,options),data=await reply.text();status.textContent=`HTTP ${reply.status}`;
+    try{output.textContent=JSON.stringify(JSON.parse(data),null,2);}catch{output.textContent=data;}
+   }catch(error){status.textContent='Ошибка';output.textContent=error.message;}finally{submit.disabled=false;}
+  });
+  panel.append(submit,status,output);block.append(summary,panel);root.append(block);
+ }
+ document.getElementById('search').addEventListener('input',e=>{for(const row of root.children)row.hidden=!row.dataset.search.includes(e.target.value.toLowerCase().trim());});
+}
+load().catch(error=>{root.replaceChildren(element('p',error.message,'error'));});
+</script>
+</html>

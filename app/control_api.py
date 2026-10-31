@@ -4,11 +4,19 @@ from __future__ import annotations
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, unquote
 try:
     from .device_tests import catalog as test_catalog, run as run_device_tests
+    from .emergency_tests import catalog as emergency_catalog, run as run_emergency_tests
+    from .ujin_integration import UjinIntegration
+    from .home_client import scenario_templates, LocalHomeClient, HomeApiError
+    from .api_schema import openapi_schema, api_description, VERSION
 except ImportError:  # python app/run.py
     from device_tests import catalog as test_catalog, run as run_device_tests
+    from emergency_tests import catalog as emergency_catalog, run as run_emergency_tests
+    from ujin_integration import UjinIntegration
+    from home_client import scenario_templates, LocalHomeClient, HomeApiError
+    from api_schema import openapi_schema, api_description, VERSION
 
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "web", "dist"))
 CONTENT_TYPES = {
@@ -25,8 +33,10 @@ CONTENT_TYPES = {
 
 
 class ControlServer:
-    def __init__(self, orchestrator, host="127.0.0.1", port=8787):
+    def __init__(self, orchestrator, host="127.0.0.1", port=8787, ujin=None):
         self.orchestrator = orchestrator
+        self.ujin = ujin or UjinIntegration(orchestrator)
+        self.client = LocalHomeClient(orchestrator, self.ujin)
         owner = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -50,7 +60,11 @@ class ControlServer:
 
             def read_json(self):
                 size = int(self.headers.get("Content-Length", 0))
-                return json.loads((self.rfile.read(size) or b"{}").decode())
+                if size < 0 or size > 1024 * 1024:
+                    raise ValueError('Размер JSON-запроса превышает 1 МБ')
+                value = json.loads((self.rfile.read(size) or b"{}").decode())
+                if not isinstance(value, dict): raise ValueError('Ожидается JSON-объект')
+                return value
 
             @staticmethod
             def web_path(path):
@@ -92,8 +106,8 @@ class ControlServer:
 
             def send_config(self):
                 return self.send_json({
-                    "app": "Power Guardian",
-                    "version": "1.0.0",
+                    "app": "UjinFizteha",
+                    "version": VERSION,
                     "device_id": "smart_plug_1",
                     "poll_interval_ms": 1000,
                     "confirmation_ttl_seconds": 60,
@@ -111,14 +125,35 @@ class ControlServer:
 
             def do_GET(self):
                 parsed = urlparse(self.path)
-                path = parsed.path
+                path = unquote(parsed.path)
                 query = parse_qs(parsed.query)
+                if path in ('/api', '/api/'):
+                    return self.send_json(api_description())
+                if path == '/api/openapi.json':
+                    return self.send_json(openapi_schema())
+                if path in ('/api/docs', '/api/docs/'):
+                    with open(os.path.join(os.path.dirname(__file__), 'api_docs.html'), 'rb') as source:
+                        return self.send_body(source.read(), 'text/html; charset=utf-8')
+                if path == '/api/statistics':
+                    return self.send_json(owner.client.statistics())
+                if (path.startswith('/api/devices/') or path.startswith('/api/scenarios/')) and len(path.split('/')) == 4:
+                    key = path.split('/')[3]
+                    try:
+                        return self.send_json(owner.client.device(key) if path.startswith('/api/devices/') else owner.client.scenario(key))
+                    except HomeApiError as exc:
+                        return self.send_json({'error': str(exc)}, exc.status or 400)
                 if path == "/api/state":
                     return self.send_json(owner.orchestrator.state())
                 if path == "/api/devices":
                     return self.send_json(owner.orchestrator.declarations())
                 if path == '/api/device-tests':
                     return self.send_json(test_catalog(owner.orchestrator))
+                if path == '/api/emergency-tests':
+                    return self.send_json(emergency_catalog(owner.orchestrator))
+                if path == '/api/integrations/ujin':
+                    return self.send_json(owner.ujin.status())
+                if path == '/api/scenario-templates':
+                    return self.send_json(scenario_templates())
                 if path == "/api/events":
                     limit = self.query_limit(query, 50, 200)
                     return self.send_json(owner.orchestrator.events_since(limit))
@@ -139,18 +174,31 @@ class ControlServer:
                 return self.send_json({"error": "not_found"}, 404)
 
             def do_HEAD(self):
-                path = urlparse(self.path).path
-                if path == "/web" or path.startswith("/web/"):
-                    return self.send_static(path)
-                if path in ("/api/state", "/api/events", "/api/scenarios",
-                            "/api/health", "/api/config", "/api/devices"):
-                    return self.send_json({})
-                return self.send_json({"error": "not_found"}, 404)
+                return self.do_GET()
 
             def do_POST(self):
-                path = urlparse(self.path).path
+                path = unquote(urlparse(self.path).path)
                 try:
                     body = self.read_json()
+                    if path == '/api/commands':
+                        return self.send_json(owner.client.apply_command(body['device'], body['signal'], body.get('value')))
+                    if path.startswith('/api/scenario-templates/') and path.endswith('/apply') and len(path.split('/')) == 5:
+                        return self.send_json(owner.client.create_from_template(path.split('/')[3], body.get('name'), body.get('enabled', True)), 201)
+                    if path == '/api/integrations/ujin':
+                        if not isinstance(body, dict):
+                            raise ValueError('Ожидается действие интеграции Ujin')
+                        action = body.get('action')
+                        if action == 'check':
+                            return self.send_json(owner.ujin.start('read', once=True), 202)
+                        if action == 'start':
+                            return self.send_json(owner.ujin.start(body.get('mode', 'read')), 202)
+                        if action == 'stop':
+                            return self.send_json(owner.ujin.stop())
+                        raise ValueError('Неизвестное действие интеграции Ujin')
+                    if path == '/api/emergency-tests':
+                        if not isinstance(body, dict):
+                            raise ValueError('Ожидается объект с параметрами аварийного теста')
+                        return self.send_json(run_emergency_tests(owner.orchestrator, body.get('case')))
                     if path == '/api/device-tests':
                         if not isinstance(body, dict):
                             raise ValueError('Ожидается объект с параметрами проверки')
@@ -177,7 +225,9 @@ class ControlServer:
                     if path == "/api/demo/start":
                         return self.send_json(owner.orchestrator.experiment(body.get("preset", "overload")))
                     return self.send_json({"error": "not_found"}, 404)
-                except (KeyError, PermissionError, ValueError) as exc:
+                except HomeApiError as exc:
+                    return self.send_json({'error': str(exc)}, exc.status or 400)
+                except (KeyError, PermissionError, ValueError, TypeError) as exc:
                     return self.send_json({"error": str(exc)}, 400)
                 except Exception as exc:
                     return self.send_json({"error": str(exc)}, 500)
@@ -185,8 +235,19 @@ class ControlServer:
             def log_message(self, fmt, *args):
                 return
 
+            def do_PUT(self):
+                path = unquote(urlparse(self.path).path)
+                if not path.startswith('/api/scenarios/') or len(path.split('/')) != 4:
+                    return self.send_json({'error': 'not_found'}, 404)
+                try:
+                    return self.send_json(owner.client.update_scenario(path.split('/')[3], self.read_json()))
+                except HomeApiError as exc:
+                    return self.send_json({'error': str(exc)}, exc.status or 400)
+                except (KeyError, PermissionError, ValueError, TypeError) as exc:
+                    return self.send_json({'error': str(exc)}, 400)
+
             def do_DELETE(self):
-                path = urlparse(self.path).path
+                path = unquote(urlparse(self.path).path)
                 try:
                     if path.startswith('/api/scenarios/') and len(path.split('/')) == 4:
                         return self.send_json(owner.orchestrator.delete_scenario(path.split('/')[3]))
@@ -207,5 +268,6 @@ class ControlServer:
         return thread
 
     def stop(self):
+        self.ujin.stop()
         self.httpd.shutdown()
         self.httpd.server_close()

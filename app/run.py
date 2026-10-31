@@ -81,9 +81,12 @@ def telegram_check():
         return 1
     bot = me["result"]
     print(f"Bot: @{bot.get('username')} ({bot.get('id')})")
+    if '*' in chats:
+        print("All chats are allowed. Open the bot and send /start.")
+        return 0
     sent = telegram_api(token, "sendMessage", {
         "chat_id": chats[0],
-        "text": "✅ Power Guardian подключён. Отправьте /start.",
+        "text": "✅ UjinFizteha подключён. Отправьте /start.",
     })
     if not sent.get("ok"):
         print(f"Telegram sendMessage failed: {sent.get('description')}",
@@ -97,8 +100,11 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Power Guardian smart home")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8787)
-    parser.add_argument("--mcp", action="store_true",
-                        help="serve MCP over stdio (local home unless --api-url is set)")
+    mcp_transport = parser.add_mutually_exclusive_group()
+    mcp_transport.add_argument("--mcp", action="store_true", help="serve MCP over stdio against the shared API")
+    mcp_transport.add_argument("--mcp-http", action="store_true", help="serve MCP over Streamable HTTP at /mcp")
+    parser.add_argument('--mcp-host', default='127.0.0.1')
+    parser.add_argument('--mcp-port', type=int, default=8788)
     parser.add_argument("--telegram", action="store_true",
                         help="start the Telegram long-polling bot")
     parser.add_argument("--api-url", default=None,
@@ -118,8 +124,11 @@ def main(argv=None):
     if args.telegram_check:
         return telegram_check()
     api_url = None if args.local else (args.api_url or os.environ.get("POWER_GUARDIAN_API_URL"))
-    if api_url and not (args.mcp or args.telegram):
-        parser.error("--api-url requires --mcp or --telegram")
+    mcp_enabled = args.mcp or args.mcp_http
+    if mcp_enabled and not args.local and not api_url:
+        api_url = 'http://127.0.0.1:8787'
+    if api_url and not (mcp_enabled or args.telegram):
+        parser.error("--api-url requires --mcp, --mcp-http or --telegram")
 
     orchestrator = None
     server = None
@@ -133,6 +142,13 @@ def main(argv=None):
             orchestrator.start()
             client = LocalHomeClient(orchestrator)
 
+        if not api_url and not mcp_enabled:
+            server = ControlServer(orchestrator, args.host, args.port)
+            server.start()
+            client.ujin = server.ujin
+            if os.environ.get('UJIN_MODE') in ('read', 'sync'):
+                server.ujin.start(os.environ['UJIN_MODE'])
+
         if args.telegram:
             bot = TelegramBot(client)
             if bot.enabled:
@@ -141,11 +157,13 @@ def main(argv=None):
                 print("Telegram bot disabled: set TELEGRAM_BOT_TOKEN and "
                       "TELEGRAM_ALLOWED_CHAT_IDS", file=sys.stderr, flush=True)
 
-        if args.mcp:
+        if mcp_enabled:
             try:
-                from .mcp_server import run_stdio
+                from .mcp_server import run_stdio, run_http
             except ImportError:
-                from mcp_server import run_stdio
+                from mcp_server import run_stdio, run_http
+            if args.mcp_http:
+                return run_http(client, args.mcp_host, args.mcp_port)
             return run_stdio(client)
 
         if api_url:
@@ -153,9 +171,7 @@ def main(argv=None):
             while True:
                 time.sleep(1)
 
-        server = ControlServer(orchestrator, args.host, args.port)
-        server.start()
-        print(f"Power Guardian API: http://{args.host}:{server.port}", flush=True)
+        print(f"UjinFizteha API: http://{args.host}:{server.port}", flush=True)
         while True:
             time.sleep(1)
     except KeyboardInterrupt:

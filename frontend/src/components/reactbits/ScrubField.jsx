@@ -37,6 +37,8 @@ const onColor = hex => {
 };
 
 export default function ScrubField({
+  id: inputId,
+  ariaLabel,
   label = 'Radius',
   suffix = 'px',
   value: valueProp,
@@ -60,7 +62,8 @@ export default function ScrubField({
   onCommit,
   className = ''
 }) {
-  const id = useId();
+  const generatedId = useId();
+  const id = inputId ?? generatedId;
   const reduce = useReducedMotion();
   const controlled = valueProp !== undefined;
   const [value, setValue] = useState(controlled ? valueProp : defaultValue);
@@ -230,6 +233,7 @@ export default function ScrubField({
   };
 
   const handleKeyDown = e => {
+    if (disabled) return;
     const typedNumber = draft !== null && draft.trim() !== '' ? Number(draft) : NaN;
     const from = Number.isNaN(typedNumber) ? valueRef.current : typedNumber;
     const deltas = {
@@ -263,8 +267,9 @@ export default function ScrubField({
   };
 
   const handleBlur = () => {
-    const n = draft === null ? NaN : parseFloat(draft.replace(/[^\d.-]/g, ''));
-    if (!Number.isNaN(n)) {
+    const text = draft?.trim().replace(',', '.');
+    const n = text ? Number(text) : NaN;
+    if (typingRef.current && !disabled && Number.isFinite(n)) {
       commit(n);
       onCommit?.(valueRef.current);
     }
@@ -315,6 +320,7 @@ export default function ScrubField({
       <label
         htmlFor={id}
         className="scrub-field__handle"
+        title="Потяните влево или вправо; нажмите, чтобы ввести число"
         onClick={e => {
           if (movedRef.current) e.preventDefault();
         }}
@@ -328,6 +334,7 @@ export default function ScrubField({
         type="text"
         inputMode="decimal"
         role="spinbutton"
+        aria-label={ariaLabel}
         aria-valuenow={value}
         aria-valuemin={min}
         aria-valuemax={max}
@@ -335,7 +342,10 @@ export default function ScrubField({
         defaultValue={fmt(value)}
         disabled={disabled}
         onFocus={handleFocus}
-        onChange={e => setDraft(e.target.value)}
+        onChange={e => {
+          typingRef.current = true;
+          setDraft(e.target.value);
+        }}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
       />

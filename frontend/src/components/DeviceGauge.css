@@ -80,6 +80,40 @@
 .device-card .device-value:has(.device-reading-label) { display:block; }
 .sensor-paused-note { font-size:13px; line-height:1.6; padding:12px 16px; margin:0 0 18px; color:#c2b8a7; background:#edac8209; border:1px solid #edac8218; border-radius:12px; }
 .detail-controls,.detail-controls form { min-width:0; }
+.detail-controls .device-number-field {
+  width:100%;
+  min-width:0;
+  border:1px solid #ffffff17;
+  color:#f2f3f0;
+}
+.detail-controls .device-number-field:focus-within {
+  box-shadow:0 0 0 2px #edac8266;
+  border-color:#edac82;
+}
+.detail-controls .device-number-field .scrub-field__handle {
+  margin:0;
+  color:#edac82;
+  font-size:20px;
+  flex-direction:row;
+}
+.detail-controls .device-number-field .scrub-field__input {
+  width:100%;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  outline:none;
+  color:inherit;
+  font-size:18px;
+  height:100%;
+}
+.detail-controls .device-number-field .scrub-field__suffix {
+  flex:none;
+  padding-left:4px;
+  color:#a5a397;
+  font-size:14px;
+}
 @media(max-width:600px) {
   .detail-controls > form:not(.device-gauge-control) { flex-direction:column; align-items:stretch; gap:10px; }
   .detail-controls > form > label { max-width:none; }

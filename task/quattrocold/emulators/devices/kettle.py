@@ -49,11 +49,14 @@ class Kettle(Device):
             mode = int(value)
             if mode in MODE_TEMPS:
                 self.set_value("target_temp", MODE_TEMPS[mode])
-        elif name == "power" and int(value):
-            if float(self.signals["water_level"].value) <= 0:
+        elif name == "power":
+            self.set_value("auto_off", 0)
+            if int(value) and float(self.signals["water_level"].value) <= 0:
                 self.set_value("dry_boil", 1)
                 self.set_value("power", 0)
                 self.log(f"[{self.model}] сухой ход: нагрев заблокирован")
+            if not self.signals["power"].value:
+                self.set_value("power_w", 0.0)
         elif name == "reset" and int(value):
             self.set_value("dry_boil", 0)
             self.set_value("auto_off", 0)
@@ -79,6 +82,7 @@ class Kettle(Device):
             self.set_value("energy_kwh", round(energy, 6))
             if temperature >= target:
                 self.set_value("power", 0)
+                self.set_value("power_w", 0.0)
                 self.set_value("auto_off", 1)
                 self._boils += 1
                 if self._boils >= 20:

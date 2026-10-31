@@ -57,6 +57,46 @@ class McpServerTest(unittest.TestCase):
                     "simulate_scenario", "request_device_command",
                     "confirm_device_command", "run_demo", "reset_home", "get_health"}
         self.assertTrue(expected.issubset(names))
+        self.assertTrue({'get_scenario', 'update_scenario', 'list_scenario_templates', 'create_scenario_from_template',
+            'list_emergency_tests', 'run_emergency_tests', 'list_device_diagnostics', 'run_device_diagnostics',
+            'get_ujin_status', 'manage_ujin_integration', 'describe_api'}.issubset(names))
+
+    def test_templates_and_update_tools_use_the_same_scenario_store(self):
+        self.assertEqual(len(call(self.server, 'list_scenario_templates')), 8)
+        created = call(self.server, 'create_scenario_from_template', {'template_key': 'cinema', 'enabled': False})
+        self.assertFalse(created['enabled'])
+        self.assertEqual(call(self.server, 'get_scenario', {'scenario_id': created['id']}), created)
+        created['name'] = 'Updated from MCP'
+        result = call(self.server, 'update_scenario', {'scenario_id': created['id'], 'scenario': created})
+        self.assertEqual(result['name'], 'Updated from MCP')
+
+    def test_isolated_test_tools_can_return_recorded_trace(self):
+        import copy
+        before = copy.deepcopy(self.orchestrator.state()['devices'])
+        self.assertEqual(len(call(self.server, 'list_emergency_tests')['tests']), 8)
+        report = call(self.server, 'run_emergency_tests', {'case_id': 'socket-overload', 'include_trace': True})
+        self.assertEqual(report['summary']['passed'], 1)
+        self.assertTrue(report['results'][0]['trace'])
+        concise = call(self.server, 'run_emergency_tests', {'case_id': 'gas-leak'})
+        self.assertNotIn('trace', concise['results'][0])
+        self.assertEqual(len(call(self.server, 'list_device_diagnostics')['devices']), 15)
+        self.assertEqual(call(self.server, 'run_device_diagnostics', {'device': 'light_1'})['summary']['passed'], 1)
+        self.assertEqual(before, self.orchestrator.state()['devices'])
+
+    def test_ujin_and_resources_work_through_the_shared_http_api(self):
+        from app.control_api import ControlServer
+        from app.home_client import HttpHomeClient
+        from app.mcp_server import build_server
+        control = ControlServer(self.orchestrator, port=0)
+        control.start()
+        try:
+            server = build_server(HttpHomeClient(f'http://127.0.0.1:{control.port}'))
+            self.assertIn('configured', call(server, 'get_ujin_status'))
+            self.assertFalse(call(server, 'manage_ujin_integration', {'action': 'stop'})['running'])
+            self.assertEqual(call(server, 'describe_api')['name'], 'UjinFizteha')
+            uris = {str(resource.uri) for resource in asyncio.run(server.list_resources())}
+            self.assertTrue({'home://scenario-templates', 'home://tests/emergency', 'home://integrations/ujin', 'home://api'}.issubset(uris))
+        finally: control.stop()
 
     def test_get_home_state_and_devices(self):
         state = call(self.server, "get_home_state")

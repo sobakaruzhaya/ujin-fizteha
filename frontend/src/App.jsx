@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   ChevronRight,
+  ChevronLeft,
   House,
   Workflow,
   Clock3,
@@ -19,6 +20,7 @@ import {
   Wifi,
   Power,
   MoveUpRight,
+  BookOpen,
 } from "lucide-react";
 import CountUp from "./components/reactbits/CountUp";
 import DarkVeil from "./components/reactbits/DarkVeil";
@@ -28,6 +30,11 @@ import ScenarioSheet from "./components/ScenarioSheet";
 import HomeStatistics from "./components/HomeStatistics";
 import DeviceTestsPage from "./components/DeviceTestsPage";
 import ScenarioTemplates from "./components/ScenarioTemplates";
+import NotificationsProvider, { useNotifications } from "./components/Notifications";
+import useHomeNotifications from "./components/useHomeNotifications";
+import UjinIntegration from "./components/UjinIntegration";
+import HomeHero from "./components/HomeHero";
+import McpDocs from "./components/McpDocs";
 import {
   descriptions,
   fallbackDescription,
@@ -40,6 +47,7 @@ import PillNav from "./components/reactbits/PillNav";
 import CardSwap, { Card } from "./components/reactbits/CardSwap";
 import DeviceGauge from "./components/DeviceGauge";
 import useAutoDeviceCommand from "./components/useAutoDeviceCommand";
+import ScrubField from "./components/reactbits/ScrubField";
 
 const base = import.meta.env.BASE_URL;
 
@@ -168,7 +176,7 @@ function Activity({ events, short = false, metadata = {} }) {
     );
   }
   const visible = events
-    .filter((e) => e.type !== "log")
+    .filter((e) => e.type !== "log" && !e.notification_handled)
     .slice()
     .reverse()
     .slice(0, short ? 3 : 100);
@@ -274,6 +282,7 @@ function DeviceDetails({ id, home, declarations, command, busy, online }) {
           .filter(
             (s) =>
               s.management !== "r" &&
+              !["self_test", "reset_alarm"].includes(s.name) &&
               !(
                 (id === "light_1" && s.name === "brightness") ||
                 (id === "ventilation_1" && s.name === "fan_speed")
@@ -291,7 +300,25 @@ function DeviceDetails({ id, home, declarations, command, busy, online }) {
             >
               <label htmlFor={"signal-" + s.name}>{s.title}</label>
               <div>
-                {s.control === "button" ? null : s.layout ? (
+                {id === "light_1" && s.name === "lamp" ? (
+                  <div className="detail-light-switch">
+                    <span aria-live="polite">
+                      {busy ? "Обновление…" : state.lamp ? "Включён" : "Выключен"}
+                    </span>
+                    <SquishSwitch
+                      id="signal-lamp"
+                      checked={!!state.lamp}
+                      onChange={(next) => command(id, s.name, Number(next), false)}
+                      ariaLabel={s.title}
+                      disabled={busy || !online}
+                      width={64}
+                      height={36}
+                      trackColor="#35382f"
+                      trackOnColor="#edac82"
+                      thumbOnColor="#241b14"
+                    />
+                  </div>
+                ) : s.control === "button" ? null : s.layout ? (
                   <select
                     id={"signal-" + s.name}
                     disabled={busy || !online}
@@ -311,26 +338,29 @@ function DeviceDetails({ id, home, declarations, command, busy, online }) {
                     ))}
                   </select>
                 ) : (
-                  <input
-                    required
+                  <ScrubField
                     disabled={busy || !online}
                     id={"signal-" + s.name}
-                    type="number"
-                    step="any"
+                    ariaLabel={s.title}
+                    label="↔"
+                    suffix={s.measure || ""}
+                    size="lg"
+                    className="device-number-field"
+                    accent="#edac82"
+                    chipColor="#111310"
+                    step={s.measure === "°C" ? 0.1 : 1}
+                    fineMultiplier={1}
                     min={s.min}
                     max={s.max}
-                    value={values[s.name]}
-                    onChange={(e) => {
+                    value={Number(values[s.name]) || 0}
+                    onChange={(value) => {
                       setValues((old) => ({
                         ...old,
-                        [s.name]: e.target.value,
+                        [s.name]: value,
                       }));
-                      if (e.target.validity.valid)
-                        auto.schedule(s.name, Number(e.target.value));
-                      else auto.cancel(s.name);
                     }}
-                    onBlur={(e) => {
-                      if (e.target.reportValidity()) auto.flush(s.name);
+                    onCommit={(value) => {
+                      auto.schedule(s.name, value, 0);
                     }}
                   />
                 )}
@@ -475,7 +505,7 @@ export default function App() {
       </div>
       <div className="site-content">
         {entered ? (
-          <HomeApp />
+          <NotificationsProvider><HomeApp /></NotificationsProvider>
         ) : (
           <Login
             onEnter={() => {
@@ -499,7 +529,7 @@ function HomeApp() {
     [events, setEvents] = useState([]);
   const [online, setOnline] = useState(false),
     [page, setPage] = useState(
-      ["home", "scenarios", "history", "tests"].includes(location.hash.slice(1))
+      ["home", "scenarios", "history", "tests", "integrations", "mcp"].includes(location.hash.slice(1))
         ? location.hash.slice(1)
         : "home",
     );
@@ -507,22 +537,29 @@ function HomeApp() {
     [selected, setSelected] = useState(null),
     [editor, setEditor] = useState(null),
     [settings, setSettings] = useState(false),
-    [confirmation, setConfirmation] = useState(null),
-    [message, setMessage] = useState(null);
+    [confirmation, setConfirmation] = useState(null);
   const [eventFilter, setEventFilter] = useState("all");
   const refreshBusy = useRef(false),
     scenarioDeck = useRef(null),
-    timer = useRef(),
     resolveConfirm = useRef();
+  const publish = useNotifications();
+  const notifications = useHomeNotifications(publish);
   const reduce = useReducedMotion();
+  const [compactScenarioCards, setCompactScenarioCards] = useState(
+    () => window.matchMedia("(max-width: 720px)").matches,
+  );
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 720px)");
+    const update = () => setCompactScenarioCards(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const tv = new URLSearchParams(location.search).get("mode") === "tv";
   useEffect(() => {
     document.body.dataset.mode = tv ? "tv" : "phone";
   }, [tv]);
   function notify(text, error = false) {
-    clearTimeout(timer.current);
-    setMessage({ text, error });
-    timer.current = setTimeout(() => setMessage(null), 5000);
+    publish({ kind: error ? "error" : "success", title: error ? "Не удалось выполнить действие" : "Готово", description: text });
   }
   async function refresh() {
     if (refreshBusy.current) return;
@@ -537,8 +574,10 @@ function HomeApp() {
       setDeclarations(d);
       setScenarios(s);
       setEvents(e);
+      notifications.connected(h, d, e);
       setOnline(true);
     } catch {
+      notifications.disconnected();
       setOnline(false);
     } finally {
       refreshBusy.current = false;
@@ -549,13 +588,12 @@ function HomeApp() {
     const t = setInterval(refresh, 1500);
     return () => {
       clearInterval(t);
-      clearTimeout(timer.current);
     };
   }, []);
   useEffect(() => {
     const fn = () =>
       setPage(
-        ["home", "scenarios", "history", "tests"].includes(
+        ["home", "scenarios", "history", "tests", "integrations", "mcp"].includes(
           location.hash.slice(1),
         )
           ? location.hash.slice(1)
@@ -732,9 +770,16 @@ function HomeApp() {
           />
         </div>
         <div className="header-right">
-          <span className={"connection " + (!online ? "offline" : "")}>
-            <i />
-            {online ? "На связи" : "Подключение"}
+          <a className="mcp-docs-link" href="#mcp" aria-label="Документация MCP" title="Документация MCP" aria-current={page === "mcp" ? "page" : undefined}>
+            <BookOpen size={20} />
+          </a>
+          <span
+            className={"connection " + (!online ? "offline" : "")}
+            role="status"
+            aria-label={online ? "На связи" : "Подключение"}
+            title={online ? "На связи" : "Подключение"}
+          >
+            <i aria-hidden="true" />
           </span>
           <button
             className="icon-button"
@@ -769,7 +814,18 @@ function HomeApp() {
                 initialOpacity={reduce ? 1 : 0}
               >
                 <div className="home-page">
-                  <section className="hero">
+                  {alarm && (
+                    <button className="alarm-banner" onClick={() => setSelected("smart_plug_1")}>
+                      <span><ShieldCheck size={18} />Розетка отключена защитой</span>
+                      <span>Восстановить работу <ArrowUpRight size={16} /></span>
+                    </button>
+                  )}
+                  <HomeHero reduce={reduce} onDevices={() => {
+                    const section = document.getElementById("home-devices");
+                    section?.scrollIntoView({ behavior: reduce ? "instant" : "smooth", block: "start" });
+                    section?.querySelector("h2")?.focus({ preventScroll: true });
+                  }} />
+                  <section className="hero home-overview" aria-label="Состояние дома">
                     <div className="hero-copy">
                       <span className="home-location">
                         <House size={13} /> Моя квартира <span> / </span>{" "}
@@ -778,24 +834,6 @@ function HomeApp() {
                           month: "long",
                         })}
                       </span>
-                      <h1>
-                        {alarm ? (
-                          <>
-                            Дом просит
-                            <br />
-                            вашего внимания.
-                          </>
-                        ) : (
-                          <>
-                            Дома всё
-                            <br />
-                            как надо.
-                          </>
-                        )}
-                      </h1>
-                      {alarm && (
-                        <p>Защита отключила розетку. Проверьте нагрузку.</p>
-                      )}
                       <div className="hero-status">
                         <span>
                           <House size={17} />
@@ -837,24 +875,10 @@ function HomeApp() {
                       </p>
                     </div>
                   </section>
-                  {alarm && (
-                    <button
-                      className="alarm-banner"
-                      onClick={() => setSelected("smart_plug_1")}
-                    >
-                      <span>
-                        <ShieldCheck size={18} />
-                        Розетка отключена защитой
-                      </span>
-                      <span>
-                        Восстановить работу <ArrowUpRight size={16} />
-                      </span>
-                    </button>
-                  )}
-                  <section className="devices-section">
+                  <section className="devices-section" id="home-devices">
                     <div className="section-heading">
                       <div>
-                        <h2>
+                        <h2 tabIndex={-1}>
                           Устройства
                           <span>
                             {home
@@ -1129,17 +1153,13 @@ function HomeApp() {
               </AnimatedContent>
             )}
             {page === "tests" && <DeviceTestsPage />}
+            {page === "integrations" && <UjinIntegration />}
+            {page === "mcp" && <McpDocs />}
             {page === "scenarios" && (
               <>
                 <section className="page-intro">
                   <div>
-                    <span className="home-location">Автоматизация</span>
-                    <h1>
-                      Меньше действий.
-                      <br />
-                      Больше комфорта.
-                    </h1>
-                    <p>Устройства работают вместе по вашим правилам.</p>
+                    <h1>Сценарии</h1>
                   </div>
                   <div className="scenario-intro-actions">
                     <button
@@ -1165,12 +1185,19 @@ function HomeApp() {
                   </div>
                 </section>
                 <div className="scenario-deck">
+                  <button
+                    className="scenario-deck-arrow scenario-deck-arrow-prev"
+                    aria-label="Предыдущий сценарий"
+                    onClick={() => scenarioDeck.current?.prev()}
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
                   <CardSwap
                     ref={scenarioDeck}
-                    width={460}
+                    width={compactScenarioCards ? 280 : 460}
                     height={560}
-                    cardDistance={40}
-                    verticalDistance={40}
+                    cardDistance={compactScenarioCards ? 20 : 40}
+                    verticalDistance={compactScenarioCards ? 20 : 40}
                     autoplay={false}
                     parallax={0.15}
                     skewAmount={2}
@@ -1265,23 +1292,13 @@ function HomeApp() {
                       <span>Создать сценарий</span>
                     </button>
                   </CardSwap>
-                  <div className="scenario-deck-controls">
-                    <span>
-                      {scenarios.length} сценариев · листайте карточки
-                    </span>
-                    <button
-                      className="secondary"
-                      onClick={() => scenarioDeck.current?.prev()}
-                    >
-                      Назад
-                    </button>
-                    <button
-                      className="secondary"
-                      onClick={() => scenarioDeck.current?.next()}
-                    >
-                      Далее
-                    </button>
-                  </div>
+                  <button
+                    className="scenario-deck-arrow scenario-deck-arrow-next"
+                    aria-label="Следующий сценарий"
+                    onClick={() => scenarioDeck.current?.next()}
+                  >
+                    <ChevronRight size={24} />
+                  </button>
                 </div>
                 <ScenarioTemplates
                   home={home}
@@ -1308,6 +1325,7 @@ function HomeApp() {
                   ].map(([v, t]) => (
                     <button
                       className={eventFilter === v ? "selected" : ""}
+                      aria-pressed={eventFilter === v}
                       key={v}
                       onClick={() => setEventFilter(v)}
                     >
@@ -1317,7 +1335,9 @@ function HomeApp() {
                 </div>
                 <Activity
                   events={meaningful.filter(
-                    (e) => eventFilter === "all" || e.type === eventFilter,
+                    (e) => eventFilter === "all" || e.type === eventFilter ||
+                      (eventFilter === "alarm" && e.category === "safety") ||
+                      (eventFilter === "command" && e.category === "commands"),
                   )}
                 />
               </>
@@ -1325,16 +1345,6 @@ function HomeApp() {
           </motion.div>
         </AnimatePresence>
       </main>
-      <footer>
-        <span className="footer-brand">UjinFizteha</span>
-        <span>
-          <i />
-          Эмуляторы Ujin OS
-        </span>
-        <button onClick={() => setSettings(true)}>
-          Лаборатория <ArrowUpRight size={12} />
-        </button>
-      </footer>
       {selected && home && (
         <Modal title={meta(selected)} onClose={() => setSelected(null)}>
           <DeviceDetails
@@ -1378,10 +1388,16 @@ function HomeApp() {
               {home ? Object.keys(home.devices).length : "—"} эмуляторов
             </span>
           </div>
+          <button className="secondary settings-ujin-link" onClick={() => { setSettings(false); location.hash = "integrations"; }}>
+            Подключение Ujin <ArrowUpRight size={16} />
+          </button>
+          <a className="secondary settings-ujin-link" href="#mcp" onClick={() => setSettings(false)}>
+            Подключение MCP <BookOpen size={16} />
+          </a>
           <h3>Попробовать в лаборатории</h3>
           <p className="settings-description">
-            Эксперименты меняют виртуальные устройства. Настоящее оборудование
-            не подключено.
+            Эксперименты меняют виртуальные устройства. При включённом обмене
+            их показания отправляются в Ujin.
           </p>
           <div className="experiment-list">
             {[
@@ -1478,20 +1494,6 @@ function HomeApp() {
           </div>
         </Modal>
       )}
-      <AnimatePresence>
-        {message && (
-          <motion.div
-            role="status"
-            className={"toast " + (message.error ? "error" : "")}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 12 }}
-          >
-            {message.error ? <ShieldCheck size={16} /> : <Check size={16} />}
-            {message.text}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

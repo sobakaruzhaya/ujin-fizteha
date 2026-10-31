@@ -26,6 +26,17 @@ test("device settings save automatically without Apply or confirmation", async (
     .click();
   let dialog = page.getByRole("dialog", { name: "Основной свет", exact: true });
   const brightness = dialog.getByRole("slider", { name: "Яркость света" });
+  const lightSwitch = dialog.getByRole("switch", { name: "Свет", exact: true });
+  await expect(lightSwitch).toHaveAttribute("aria-checked", "true");
+  await expect(dialog.getByRole("combobox", { name: "Свет", exact: true })).toHaveCount(0);
+  await lightSwitch.focus();
+  await lightSwitch.press("Space");
+  await expect.poll(async () => (await (await request.get("/api/state")).json()).devices.light_1.lamp).toBe(0);
+  await expect(lightSwitch).toHaveAttribute("aria-checked", "false");
+  await expect(brightness).toHaveAttribute("aria-disabled", "true");
+  // A remote command while the modal is open must also update the switch.
+  await request.post("/api/commands", { data: { device: "light_1", signal: "lamp", value: 1 } });
+  await expect(lightSwitch).toHaveAttribute("aria-checked", "true");
   await expect(brightness).not.toHaveAttribute("aria-disabled", "true");
   await brightness.focus();
   await brightness.press("End");
@@ -133,7 +144,7 @@ test("automatic settings recover from a failed request", async ({
   );
   await input.fill("1800");
   await input.press("Tab");
-  await expect(page.getByRole("status")).toContainText(
+  await expect(page.getByRole("alert")).toContainText(
     "Проверка ошибки сохранения",
   );
   await expect(input).toHaveValue(String(before));

@@ -4,6 +4,7 @@ import {
   Check,
   ChevronDown,
   FlaskConical,
+  Flame,
   LoaderCircle,
   Play,
   RotateCcw,
@@ -12,6 +13,8 @@ import {
 } from "lucide-react";
 import { descriptions, fallbackDescription } from "./deviceCatalog";
 import "./DeviceTestsPage.css";
+import { useNotifications } from "./Notifications";
+import TestPlayback from "./TestPlayback";
 
 const names = {
   idle: "Не проверено",
@@ -30,6 +33,48 @@ async function request(path, options = {}) {
 }
 
 export default function DeviceTestsPage() {
+  const [mode, setMode] = useState("emergency");
+  return (
+    <>
+      <div className="tests-mode-tabs" role="group" aria-label="Тип тестирования">
+        <button aria-pressed={mode === "emergency"} onClick={() => setMode("emergency")}>Аварийные ситуации</button>
+        <button aria-pressed={mode === "devices"} onClick={() => setMode("devices")}>Диагностика устройств</button>
+      </div>
+      <ChecksPage key={mode} emergency={mode === "emergency"} />
+    </>
+  );
+}
+
+function SensorReaction({ result }) {
+  return (
+    <details className="test-check-details test-sensor-reaction">
+      <summary>Реакция датчиков <ChevronDown size={15} /></summary>
+      <div className="test-reaction-timeline">
+        {result.timeline.map((stage, i) => (
+          <section className="test-reaction-stage" key={i}>
+            <h3>{stage.title}<span>{stage.seconds} с</span></h3>
+            <dl>{stage.readings.map((r) => (
+              <div key={`${r.device}.${r.signal}`}>
+                <dt>{r.title}<small>{r.source}</small></dt>
+                <dd>{r.label || show(r.value)}{!r.label && r.measure ? ` ${r.measure}` : ""}</dd>
+              </div>
+            ))}</dl>
+          </section>
+        ))}
+      </div>
+      {result.rules.length > 0 && <p className="test-stand-rules">Правила стенда: {result.rules.join("; ")}</p>}
+      {result.events.some((e) => e.type === "scenario_triggered") && (
+        <ul>{result.events.filter((e) => e.type === "scenario_triggered").map((event) => (
+          <li key={event.id}><Check size={15} /><span>{event.message}</span></li>
+        ))}</ul>
+      )}
+    </details>
+  );
+}
+
+function ChecksPage({ emergency }) {
+  const publish = useNotifications();
+  const endpoint = emergency ? "/api/emergency-tests" : "/api/device-tests";
   const [catalog, setCatalog] = useState([]),
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
@@ -40,13 +85,30 @@ export default function DeviceTestsPage() {
     runLock = useRef(false),
     mounted = useRef(true);
   const [runInfo, setRunInfo] = useState(null);
+  const [playback, setPlayback] = useState(null), [speed, setSpeed] = useState(1);
+  const playbackView = useRef(null);
+  useEffect(() => {
+    if (playback) playbackView.current?.scrollIntoView({
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      block: "start",
+    });
+  }, [playback?.key]);
+  function viewResult(result, abort) {
+    return new Promise((resolve) => {
+      const finish = () => { abort?.signal.removeEventListener("abort", finish); resolve(); };
+      if (abort?.signal.aborted) return finish();
+      abort?.signal.addEventListener("abort", finish, { once: true });
+      setPlayback({ result, key: crypto.randomUUID(), signal: abort?.signal, onFinished: finish });
+    });
+  }
   function load() {
     const abort = new AbortController();
     setLoading(true);
     setError("");
-    request("/api/device-tests", { signal: abort.signal })
+    setPlayback(null);
+    request(endpoint, { signal: abort.signal })
       .then((data) => {
-        if (mounted.current) setCatalog(data.devices);
+        if (mounted.current) setCatalog(emergency ? data.tests : data.devices);
       })
       .catch((e) => {
         if (mounted.current && !abort.signal.aborted) setError(e.message);
@@ -84,37 +146,55 @@ export default function DeviceTestsPage() {
     let done = 0,
       stopped = false;
     setError("");
+    setPlayback(null);
     setRunInfo({ done: 0, total: ids.length, state: "running" });
     try {
       for (const id of ids) {
         if (abort.signal.aborted) break;
         setRunning(id);
         try {
-          const report = await request("/api/device-tests", {
+          const report = await request(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ device: id }),
+            body: JSON.stringify(emergency ? { case: id } : { device: id }),
             signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]),
           });
-          const result = report.results.find((r) => r.device === id);
+          const result = report.results.find((r) => (r.id || r.device) === id);
           if (!result) throw Error("Сервер вернул неполный результат проверки");
           if (!mounted.current) return;
           setResults((old) => ({
             ...old,
             [id]: { ...result, finished_at: report.finished_at },
           }));
+          if (result.trace?.length) {
+            await viewResult(result, abort);
+            if (!mounted.current || abort.signal.aborted) break;
+          }
+          const name = catalog.find((c) => c.id === id)?.name || result.name;
+          const failures = result.checks.filter((c) => !c.passed);
+          const reactions = result.checks.filter((c) => c.passed).slice(0, 2);
+          publish({
+            key: `test:${report.id}:${id}`,
+            scope: emergency ? "Тестовый стенд" : "Диагностика",
+            kind: result.status === "passed" ? "success" : "error",
+            title: `${name}: ${result.status === "passed" ? "проверка пройдена" : "ошибка проверки"}`,
+            description: result.status === "passed"
+              ? reactions.map((c) => c.title).join(". ") + ` (${result.checks.length} проверок)`
+              : failures.map((c) => c.error || c.title).slice(0, 2).join(". "),
+          });
         } catch (e) {
           if (!mounted.current || abort.signal.aborted) break;
           setResults((old) => ({
             ...old,
             [id]: {
-              device: id,
+              id,
               status: "failed",
               checks: [],
               error: e.message,
               finished_at: Date.now() / 1000,
             },
           }));
+          publish({ kind: "error", scope: emergency ? "Тестовый стенд" : "Диагностика", title: "Не удалось выполнить проверку", description: e.message });
         }
         done++;
         setRunInfo({ done, total: ids.length, state: "running" });
@@ -138,6 +218,7 @@ export default function DeviceTestsPage() {
         JSON.stringify(
           {
             mode: "isolated",
+            type: emergency ? "emergency" : "device-diagnostics",
             exported_at: new Date().toISOString(),
             results: Object.values(results),
           },
@@ -150,7 +231,7 @@ export default function DeviceTestsPage() {
     const url = URL.createObjectURL(blob),
       link = document.createElement("a");
     link.href = url;
-    link.download = "ujinfizteha-device-tests.json";
+    link.download = emergency ? "ujinfizteha-emergency-tests.json" : "ujinfizteha-device-tests.json";
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -166,8 +247,8 @@ export default function DeviceTestsPage() {
           <span className="home-location">
             <FlaskConical size={15} /> Лаборатория
           </span>
-          <h1>Тесты устройств</h1>
-          <p>Проверьте работу, показания и защиту каждого эмулятора.</p>
+          <h1>{emergency ? "Аварийные тесты" : "Тесты устройств"}</h1>
+          <p>{emergency ? "Смоделируйте аварию и посмотрите, как реагируют датчики и защиты." : "Проверьте работу, показания и защиту каждого эмулятора."}</p>
         </div>
         <div className="tests-main-actions">
           {running ? (
@@ -205,15 +286,15 @@ export default function DeviceTestsPage() {
         <div>
           <strong>Изолированные проверки</strong>
           <span>
-            Команды выполняются на отдельных экземплярах настоящих эмуляторов со
-            стандартными настройками. Устройства дома и сохранённые сценарии не
-            изменяются.
+            {emergency
+              ? "Аварии моделируются на отдельном стенде. Проверяем встроенные защиты и явно указанные тестовые правила. Показания до события, реакция и восстановление доступны в результатах. Устройства дома и сохранённые сценарии не изменяются."
+              : "Команды выполняются на отдельных экземплярах настоящих эмуляторов со стандартными настройками. Устройства дома и сохранённые сценарии не изменяются."}
           </span>
         </div>
       </div>
       <div className="tests-summary">
         <div>
-          <span>Устройств</span>
+          <span>{emergency ? "Аварийных тестов" : "Устройств"}</span>
           <strong>{loading ? "—" : catalog.length}</strong>
         </div>
         <div>
@@ -250,6 +331,9 @@ export default function DeviceTestsPage() {
           />
         </div>
       )}
+      {playback && <div ref={playbackView}>
+        <TestPlayback key={playback.key} {...playback} speed={speed} onSpeedChange={setSpeed} />
+      </div>}
       <div className="tests-toolbar">
         <div
           className="tests-filters"
@@ -277,6 +361,7 @@ export default function DeviceTestsPage() {
           onClick={() => {
             setResults({});
             setRunInfo(null);
+            setPlayback(null);
           }}
         >
           <RotateCcw size={14} />
@@ -286,7 +371,7 @@ export default function DeviceTestsPage() {
       {loading && (
         <div className="tests-empty" role="status">
           <LoaderCircle className="animate-spin" size={24} />
-          Загружаем устройства…
+          {emergency ? "Загружаем аварийные тесты…" : "Загружаем устройства…"}
         </div>
       )}
       {error && (
@@ -300,7 +385,7 @@ export default function DeviceTestsPage() {
       {!loading && !error && !visible.length && (
         <div className="tests-empty">
           {catalog.length
-            ? "Нет устройств с таким результатом"
+            ? (emergency ? "Нет тестов с таким результатом" : "Нет устройств с таким результатом")
             : "В доме пока нет доступных устройств"}
         </div>
       )}
@@ -309,6 +394,7 @@ export default function DeviceTestsPage() {
           const result = results[d.id],
             status = running === d.id ? "running" : result?.status || "idle";
           const spec = descriptions[d.id] || fallbackDescription;
+          const picture = emergency ? d.image : spec.image;
           return (
             <article
               className={"test-device-card status-" + status}
@@ -317,12 +403,12 @@ export default function DeviceTestsPage() {
               aria-busy={status === "running"}
             >
               <div className="test-device-heading">
-                <img
-                  src={`${import.meta.env.BASE_URL}images/${spec.image}.webp`}
+                {picture ? <img
+                  src={`${import.meta.env.BASE_URL}images/${picture}.webp`}
                   alt=""
-                />
+                /> : <div className="test-case-symbol" aria-hidden="true"><Flame size={30} /></div>}
                 <div>
-                  <span>{d.room}</span>
+                  <span>{emergency ? d.category : d.room}</span>
                   <h2>{d.name}</h2>
                 </div>
                 <span className={"test-result-badge " + status}>
@@ -337,6 +423,13 @@ export default function DeviceTestsPage() {
                 </span>
               </div>
               <p className="test-description">{d.description}</p>
+              {emergency && (
+                <div className="test-case-expectation">
+                  <strong>Ожидаемая реакция</strong><p>{d.expected}</p>
+                  <span>{d.mechanism}</span>
+                  {d.note && <p className="test-case-note">{d.note}</p>}
+                </div>
+              )}
               <div className="test-device-actions">
                 <button
                   className="secondary"
@@ -366,6 +459,10 @@ export default function DeviceTestsPage() {
                   {result.error}
                 </p>
               )}
+              {result?.trace?.length > 0 && <button className="test-view-trace" disabled={!!running} onClick={() => viewResult(result)}>
+                <Play size={15} /> Посмотреть ход теста
+              </button>}
+              {result?.timeline?.length > 0 && <SensorReaction result={result} />}
               {result?.checks.length > 0 && (
                 <details
                   className="test-check-details"
@@ -386,9 +483,10 @@ export default function DeviceTestsPage() {
                         {check.passed ? <Check size={15} /> : <X size={15} />}
                         <div>
                           <strong>{check.title}</strong>
+                          {check.source && <span>{check.source} · {check.signal_title}</span>}
                           <span>
                             {check.error ||
-                              `Ожидание: ${check.comparison === "==" ? "" : check.comparison + " "}${show(check.expected)} · Получено: ${show(check.actual)}`}
+                              `Ожидание: ${check.comparison === "==" ? "" : check.comparison + " "}${show(check.expected)}${check.measure ? " " + check.measure : ""} · Получено: ${show(check.actual)}${check.measure ? " " + check.measure : ""}`}
                           </span>
                         </div>
                       </li>
@@ -403,7 +501,7 @@ export default function DeviceTestsPage() {
                   )}
                   <span>
                     {result.duration_ms !== undefined
-                      ? `${result.duration_ms} мс`
+                      ? `${result.duration_ms} мс${result.simulated_seconds != null ? ` · модель ${result.simulated_seconds} с` : ""}`
                       : ""}
                   </span>
                 </div>

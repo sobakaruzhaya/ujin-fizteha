@@ -135,7 +135,11 @@ export const descriptions = {
     toggle: "power",
     on: 1,
     alarm: "dry_boil",
-    status: (d) => (d.dry_boil ? "Сухой ход" : d.power ? "Нагрев" : "Готов"),
+    status: (d) => d.dry_boil ? "Сухой ход"
+      : d.power ? `Включён · нагрев до ${d.target_temp} °C`
+      : d.keep_warm ? "Поддержание температуры"
+      : d.auto_off ? "Вода нагрета · автоотключение"
+      : "Выключен",
   },
   stove_1: {
     image: "stove",

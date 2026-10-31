@@ -44,7 +44,7 @@ test("React home: imagery, commands, overload recovery, rules and mobile", async
     .getByRole("button", { name: "Сбросить защиту", exact: true })
     .click();
   await expect(page.locator(".alarm-banner")).not.toBeVisible();
-  await device.getByRole("button", { name: "Закрыть" }).click();
+  await device.getByRole("button", { name: "Закрыть", exact: true }).click();
   await page
     .getByRole("switch", { name: "Включить Умная розетка", exact: true })
     .click();

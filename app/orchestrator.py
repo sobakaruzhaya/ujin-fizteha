@@ -12,6 +12,11 @@ import threading
 import time
 import uuid
 
+try:
+    from .device_notifications import DeviceNotificationObserver
+except ImportError:
+    from device_notifications import DeviceNotificationObserver
+
 EMU_DIR = str(Path(__file__).resolve().parent.parent / 'task/quattrocold/emulators')
 if EMU_DIR not in sys.path:
     sys.path.insert(0, EMU_DIR)
@@ -61,6 +66,8 @@ class Orchestrator:
             except (ValueError, KeyError, TypeError, OSError):
                 self.add_event('error', message='Не удалось прочитать сохранённые сценарии. Загружены стандартные.')
         self._last_values = self._device_state(self.device)
+        self._last_kettle_values = self._device_state(self.devices['kettle_1'])
+        self.device_notifications = DeviceNotificationObserver(self)
 
     def _make_devices(self):
         self.devices = {
@@ -138,11 +145,32 @@ class Orchestrator:
             self.device.set_value('power_w', 0.0)
             self.device.set_value('current_a', 0.0)
         current = self._device_state(self.device)
-        if current['overload_alarm'] == 1 and self._last_values['overload_alarm'] != 1:
-            self.add_event('alarm', device='smart_plug_1', message='Розетка отключена: превышен лимит мощности. Уменьшите нагрузку перед сбросом защиты.')
-        if current['power_switch'] != self._last_values['power_switch']:
-            self.add_event('state_change', device='smart_plug_1', signal='power_switch', value=current['power_switch'])
         self._last_values = current
+        self._observe_kettle_state()
+        self.device_notifications.observe(self)
+
+    def _observe_kettle_state(self, source='device'):
+        current = self._device_state(self.devices['kettle_1'])
+        before = self._last_kettle_values
+        if bool(current['power']) != bool(before['power']):
+            temperature, target = current['temperature'], current['target_temp']
+            if current['power']:
+                kind = 'device_state' if source == 'device' and current['keep_warm'] else 'device_started'
+                message = f'Чайник включён: нагрев до {target:g} °C. Сейчас {temperature:g} °C.'
+            elif current['auto_off']:
+                kind = 'device_state' if current['keep_warm'] else 'device_finished'
+                message = f'Чайник: вода нагрета до {temperature:g} °C. Нагрев завершён, чайник выключился автоматически.'
+                if current['keep_warm']:
+                    message += ' Включено поддержание температуры.'
+            else:
+                kind = 'device_stopped'
+                message = 'Чайник: нагрев остановлен.'
+            self.add_event(kind, device='kettle_1', signal='power', value=current['power'],
+                           temperature=temperature, target_temp=target, source=source, message=message,
+                           notification=kind != 'device_state', category='commands',
+                           title='Вода нагрета' if kind == 'device_finished' else 'Чайник включён' if current['power'] else 'Нагрев остановлен',
+                           kind='success' if kind == 'device_finished' else 'info', watch_key='kettle_1:power')
+        self._last_kettle_values = current
 
     @staticmethod
     def _device_state(device):
@@ -155,7 +183,7 @@ class Orchestrator:
         with self.lock:
             return {'devices': {key: self._device_state(d) for key, d in self.devices.items()},
                     'metadata': copy.deepcopy(self.metadata), 'updated_at': time.time(),
-                    'mode': 'emulation', 'summary': {'power_w': self.total_power(),
+                    'mode': 'emulation', 'notification_protocol': 1, 'summary': {'power_w': self.total_power(),
                     'energy_kwh': round(sum(d.signals['energy_kwh'].value for d in self.devices.values() if 'energy_kwh' in d.signals), 6),
                     'active_scenarios': sum(s['enabled'] for s in self.scenarios.values())}}
 
@@ -275,7 +303,11 @@ class Orchestrator:
         d.set_value(signal, value)
         d.on_command(signal, value)
         self.add_event('command', device=device_id, signal=signal, value=value, source=source,
+                       notification_handled=True,
                        message=f"{self.metadata[device_id]['name']}: {d.signals[signal].title} → {value}")
+        if device_id == 'kettle_1':
+            self._observe_kettle_state(source)
+        self.device_notifications.observe(self, device_id, source, (signal, value))
         return {'device': device_id, 'signal': signal, 'value': d.signals[signal].value}
 
     def request_command(self, device_id, signal, value, require_confirmation=True):
@@ -304,6 +336,8 @@ class Orchestrator:
             self._edges.clear()
             self.history.clear()
             self._last_values = self._device_state(self.device)
+            self._last_kettle_values = self._device_state(self.devices['kettle_1'])
+            self.device_notifications.reset(self)
             self.add_event('reset', message='Состояние эмуляторов сброшено. Сценарии сохранены.')
             return self.state()
 
@@ -368,6 +402,8 @@ class Orchestrator:
                 item['id'] = str(item.get('id') or 'preview')
                 clone.scenarios[item['id']] = item
             clone._last_values = self._device_state(clone.device)
+            clone._last_kettle_values = self._device_state(clone.devices['kettle_1'])
+            clone.device_notifications.reset(clone)
             for _ in range(max(1, min(int(seconds), 120))):
                 clone.step()
             return {'state': clone.state(), 'events': clone.events_since(200), 'history': clone.history}

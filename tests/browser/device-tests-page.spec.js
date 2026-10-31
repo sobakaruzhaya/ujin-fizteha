@@ -3,6 +3,7 @@ import {test,expect} from '@playwright/test';
 test.beforeEach(async({page})=>{
   await page.addInitScript(()=>sessionStorage.setItem('guardian-demo-entered','1'));
   await page.goto('/web/#tests');
+  await page.getByRole('button',{name:'Диагностика устройств',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Тесты устройств',exact:true})).toBeVisible();
   await expect(page.locator('.test-device-card')).toHaveCount(15);
 });
@@ -61,6 +62,7 @@ test('navigation, mobile layout and keyboard access work',async({page})=>{
   }
   await page.getByRole('link',{name:'Мой дом',exact:true}).click();
   await page.getByRole('link',{name:'Тесты',exact:true}).click();
+  await page.getByRole('button',{name:'Диагностика устройств',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Тесты устройств',exact:true})).toBeVisible();
   const run=page.getByRole('button',{name:'Запустить все тесты'});
   await run.focus();await page.keyboard.press('Enter');

@@ -1,0 +1,29 @@
+.home-notifications {
+  position:fixed;
+  bottom:calc(16px + env(safe-area-inset-bottom, 0px));
+  right:calc(16px + env(safe-area-inset-right, 0px));
+  width:min(360px,calc(100vw - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  z-index:100000;
+  pointer-events:none;
+  color:#eee9dd;
+  font-family:inherit;
+}
+.home-notifications .home-notification { pointer-events:auto; width:100%; font-size:13px; }
+.home-notifications .swipe-toast__card { align-items:flex-start; gap:9px; padding:12px; border:1px solid #edac8233; box-shadow:0 8px 24px #0008; }
+.home-notifications .swipe-toast__icon { margin-top:19px; width:18px; height:18px; }
+.notification-title { display:block; font-size:14px; font-weight:700; line-height:1.35; overflow-wrap:anywhere; }
+.notification-title small { display:block; font-size:11px; font-weight:400; letter-spacing:.3px; color:#b9b2a2; margin-bottom:2px; }
+.home-notifications .swipe-toast__desc { font-size:12px; line-height:1.4; margin-top:3px; color:#c9c2b3; overflow-wrap:anywhere; }
+.home-notifications .swipe-toast__close { width:24px; height:24px; margin:-2px -2px 0 0; color:#d0c7b7; }
+.home-notifications .swipe-toast__close:focus-visible,
+.home-notifications .swipe-toast__card:focus-visible { outline:2px solid #edac82; outline-offset:-2px; }
+.home-notifications .notification-error .swipe-toast__card { border-color:#e5947055; }
+.home-notifications .notification-success .swipe-toast__card { border-color:#a8b99733; }
+.notification-pending { display:block; font-size:11px; text-align:right; color:#bdb5a5; text-shadow:0 1px 4px #000; }
+@media(max-width:600px) {
+  .home-notifications {
+    bottom:calc(12px + env(safe-area-inset-bottom, 0px));
+    right:calc(12px + env(safe-area-inset-right, 0px));
+    width:min(360px,calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  }
+}
