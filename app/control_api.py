@@ -6,7 +6,7 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "web"))
+WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "web", "dist"))
 CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",
@@ -15,6 +15,8 @@ CONTENT_TYPES = {
     ".svg": "image/svg+xml",
     ".png": "image/png",
     ".ico": "image/x-icon",
+    ".webp": "image/webp",
+    ".woff2": "font/woff2",
 }
 
 
@@ -73,6 +75,8 @@ class ControlServer:
                 return candidate
 
             def send_static(self, path):
+                if path in ('/web', '/web/') and not os.path.isfile(os.path.join(WEB_DIR, 'index.html')):
+                    return self.send_json({'error': 'Frontend not built. Run npm ci && npm run build in the repository root.'}, 503)
                 candidate = self.web_path(path)
                 if candidate is None:
                     return self.send_json({"error": "not_found"}, 404)
@@ -103,6 +107,9 @@ class ControlServer:
                     return self.send_json(owner.orchestrator.events_since())
                 if path == "/api/scenarios":
                     return self.send_json(owner.orchestrator.list_scenarios())
+                if path == "/api/history":
+                    with owner.orchestrator.lock:
+                        return self.send_json(list(owner.orchestrator.history))
                 if path == "/api/health":
                     return self.send_json({"status": "ok"})
                 if path == "/api/config":
@@ -137,15 +144,11 @@ class ControlServer:
                         token = path.split("/")[3]
                         return self.send_json(owner.orchestrator.confirm_command(token))
                     if path == "/api/simulations":
-                        return self.send_json(owner.orchestrator.simulate(body.get("seconds", 10)))
+                        return self.send_json(owner.orchestrator.simulate(body.get("seconds", 10), body.get("scenario")))
                     if path == "/api/demo/reset":
                         return self.send_json(owner.orchestrator.reset())
                     if path == "/api/demo/start":
-                        owner.orchestrator.device.set_value("load_w", 2400.0)
-                        owner.orchestrator.device.set_value("power_switch", 1)
-                        owner.orchestrator.device.on_command("power_switch", 1)
-                        owner.orchestrator.add_event("demo_started", message="Запущена демонстрация перегрузки")
-                        return self.send_json({"status": "started"})
+                        return self.send_json(owner.orchestrator.experiment(body.get("preset", "overload")))
                     return self.send_json({"error": "not_found"}, 404)
                 except (KeyError, PermissionError, ValueError) as exc:
                     return self.send_json({"error": str(exc)}, 400)
@@ -154,6 +157,15 @@ class ControlServer:
 
             def log_message(self, fmt, *args):
                 return
+
+            def do_DELETE(self):
+                path = urlparse(self.path).path
+                try:
+                    if path.startswith('/api/scenarios/') and len(path.split('/')) == 4:
+                        return self.send_json(owner.orchestrator.delete_scenario(path.split('/')[3]))
+                    return self.send_json({'error': 'not_found'}, 404)
+                except ValueError as exc:
+                    return self.send_json({'error': str(exc)}, 400)
 
         self.httpd = ThreadingHTTPServer((host, port), Handler)
         self.port = self.httpd.server_address[1]

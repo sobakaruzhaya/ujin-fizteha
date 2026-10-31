@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import threading
 import time
+from pathlib import Path
 
 from control_api import ControlServer
 from orchestrator import Orchestrator
@@ -18,7 +19,7 @@ def main():
     parser.add_argument("--telegram", action="store_true")
     args = parser.parse_args()
 
-    orchestrator = Orchestrator()
+    orchestrator = Orchestrator(storage_path=Path(__file__).parent / 'data' / 'scenarios.json')
     orchestrator.start()
     if args.mcp:
         from mcp_server import run_stdio

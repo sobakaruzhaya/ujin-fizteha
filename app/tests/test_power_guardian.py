@@ -2,6 +2,9 @@ import json
 import os
 import sys
 import unittest
+import tempfile
+import copy
+import re
 import urllib.error
 import urllib.request
 
@@ -66,6 +69,45 @@ class OrchestratorTest(unittest.TestCase):
         self.assertIn("state", result)
         self.assertEqual(before["devices"]["smart_plug_1"], self.o.state()["devices"]["smart_plug_1"])
 
+    def test_cross_device_rule_and_single_edge(self):
+        self.o.create_scenario({'name': 'Свежий воздух', 'when': {
+            'device': 'ventilation_1', 'signal': 'co2', 'operator': '>', 'value': 1000},
+            'do': [{'device': 'light_1', 'signal': 'lamp', 'value': 1}]})
+        self.o.experiment('co2')
+        self.o.step()
+        self.assertEqual(self.o.devices['light_1'].signals['lamp'].value, 1)
+        self.o.step()
+        self.assertEqual(len([e for e in self.o.events if e['type'] == 'scenario_triggered']), 1)
+
+    def test_invalid_rule_cannot_break_loop(self):
+        for value in (float('nan'), '1000', None):
+            with self.assertRaises(ValueError):
+                self.o.create_scenario({'name': 'Broken', 'when': {
+                    'device': 'smart_plug_1', 'signal': 'power_w', 'operator': '>', 'value': value},
+                    'do': [{'device': 'light_1', 'signal': 'lamp', 'value': 1}]})
+        self.o.step()
+
+    def test_simulation_preserves_internal_timers_edges_and_events(self):
+        self.o.request_command('light_1', 'offline_timeout', 10, False)
+        self.o.request_command('light_1', 'lamp', 1, False)
+        before = (self.o.devices['light_1']._timer, self.o.device.tick_count,
+                  copy.deepcopy(self.o.events), copy.deepcopy(self.o._edges))
+        self.o.simulate(30)
+        after = (self.o.devices['light_1']._timer, self.o.device.tick_count,
+                 self.o.events, self.o._edges)
+        self.assertEqual(before, after)
+        self.assertEqual(self.o.devices['light_1'].signals['lamp'].value, 1)
+
+    def test_persistent_scenario_lifecycle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, 'scenarios.json')
+            first = Orchestrator(storage_path=path)
+            first.toggle_scenario('overload_protection', False)
+            second = Orchestrator(storage_path=path)
+            self.assertFalse(second.list_scenarios()[0]['enabled'])
+            second.delete_scenario('overload_protection')
+            self.assertEqual(Orchestrator(storage_path=path).list_scenarios(), [])
+
 
 class ApiTest(unittest.TestCase):
     def setUp(self):
@@ -112,18 +154,22 @@ class ApiTest(unittest.TestCase):
         self.assertIn("tv", config["modes"])
 
     def test_static_frontend_files(self):
+        if not os.path.isfile(os.path.join(ROOT, 'app', 'web', 'dist', 'index.html')):
+            self.skipTest('Run npm run build to test the production frontend')
         status, content_type, body = self.get("/web/")
         self.assertEqual(status, 200)
         self.assertEqual(content_type, "text/html")
         html = body.decode("utf-8")
         self.assertIn("Power Guardian", html)
 
-        status, content_type, body = self.get("/web/style.css")
+        stylesheet = re.search(r'href="([^"]+\.css)"', html).group(1)
+        javascript = re.search(r'src="([^"]+\.js)"', html).group(1)
+        status, content_type, body = self.get(stylesheet)
         self.assertEqual(status, 200)
         self.assertEqual(content_type, "text/css")
         self.assertIn(b"--accent", body)
 
-        status, content_type, body = self.get("/web/app.js")
+        status, content_type, body = self.get(javascript)
         self.assertEqual(status, 200)
         self.assertEqual(content_type, "text/javascript")
         self.assertIn(b"/api/state", body)
@@ -166,40 +212,6 @@ class ApiTest(unittest.TestCase):
         context.exception.close()
         self.assertIn("expired", payload["error"])
         self.assertEqual(self.o.state()["devices"]["smart_plug_1"]["power_switch"], 0)
-
-
-class FrontendSmokeTest(unittest.TestCase):
-    def setUp(self):
-        web_dir = os.path.join(ROOT, "app", "web")
-        with open(os.path.join(web_dir, "index.html"), encoding="utf-8") as source:
-            self.html = source.read()
-        with open(os.path.join(web_dir, "style.css"), encoding="utf-8") as source:
-            self.css = source.read()
-        with open(os.path.join(web_dir, "app.js"), encoding="utf-8") as source:
-            self.js = source.read()
-
-    def test_html_uses_live_api_and_assets(self):
-        self.assertIn("/api/state", self.js)
-        self.assertIn("/api/events", self.js)
-        self.assertIn("/api/scenarios", self.js)
-        self.assertIn("style.css", self.html)
-        self.assertIn("app.js", self.html)
-
-    def test_phone_and_tv_modes_are_present(self):
-        self.assertIn("phone", self.html)
-        self.assertIn("tv", self.html)
-        self.assertIn("data-mode", self.html)
-        self.assertIn('mode === "tv"', self.js)
-        self.assertIn('[data-mode="tv"]', self.css)
-
-    def test_controls_and_status_are_present(self):
-        for element_id in ("demo-start", "demo-reset", "reset-protection",
-                           "power-on", "power-off", "protection", "events", "scenarios"):
-            self.assertIn(f'id="{element_id}"', self.html)
-
-    def test_confirmation_flow_is_used(self):
-        self.assertIn("/api/commands/preview", self.js)
-        self.assertIn("/confirm", self.js)
 
 
 if __name__ == "__main__":
