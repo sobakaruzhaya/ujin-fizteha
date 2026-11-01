@@ -1,6 +1,6 @@
 # UjinFizteha
 Сылка на демо: http://46.147.47.179:8787/web
-Ссылка на тг бота: t.me/@ujinsmarthouse_bot
+Ссылка на тг бота: https://t.me/@ujinsmarthouse_bot
 
 
 Умный дом с веб-панелью, Telegram-ботом и MCP для AI-ассистентов.
